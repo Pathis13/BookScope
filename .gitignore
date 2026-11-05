@@ -1,5 +1,5 @@
 # Données CSV
-data/goodbooks-10k/
+data/goodbooks-10k*/
 data/processed/
 
 # Python

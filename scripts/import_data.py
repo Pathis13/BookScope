@@ -1,14 +1,9 @@
 import pandas as pd
-from pathlib import Path
 
 from pymongo import MongoClient
 from pymongo.errors import BulkWriteError
 
-ORIGINAL  = Path("../data/goodbooks-10k")
-PROCESSED = Path("../data/processed")
-
-MONGO_URI = "mongodb://localhost:27017/"
-DATABASE_NAME = "bookscope"
+from config import DATABASE_NAME, MONGO_TIMEOUT_MS, MONGO_URI, ORIGINAL, RATINGS_INITIAL, TO_READ_FILTERED
 
 
 def import_csv(collection_name, filename):
@@ -28,7 +23,7 @@ def import_csv(collection_name, filename):
         print(f"{collection_name} : Le fichier CSV est vide.")
 
 
-client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=MONGO_TIMEOUT_MS)
 
 try:
     client.admin.command("ping")
@@ -55,8 +50,8 @@ try:
 
     print("Index créés")
 
-    import_csv("ratings", PROCESSED / "ratings_initial.csv")
-    import_csv("to_read", PROCESSED / "to_read_filtered.csv")
+    import_csv("ratings", RATINGS_INITIAL)
+    import_csv("to_read", TO_READ_FILTERED)
     import_csv("books", ORIGINAL / "books.csv")
     import_csv("book_tags", ORIGINAL / "book_tags.csv")
     import_csv("tags", ORIGINAL / "tags.csv")
