@@ -1,0 +1,12 @@
+# Données CSV
+data/goodbooks-10k/
+data/processed/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Fichiers temporaires
+*.log
+.DS_Store
