@@ -5,7 +5,7 @@
 #
 # Usage (depuis scripts/) :
 #   python f1.py 1                     (par book_id)
-#   python f1.py "The Hunger Games"    (par titre exact ; si plusieurs livres ont ce titre, on les affiche)
+#   python f1.py "The Hunger Games"    (par titre ; si plusieurs livres ont ce titre, on les affiche)
 
 import sys
 
@@ -15,13 +15,18 @@ from config import DATABASE_NAME, MIN_SHARED_TAGS, MONGO_TIMEOUT_MS, MONGO_URI
 
 
 def find_books(db, query):
-    """Renvoie la liste des livres correspondant à un book_id ou à un titre exact."""
+    """Renvoie la liste des livres correspondant à un book_id ou à un titre."""
     if query.isdigit():
         return list(db.books.find(
                 {"book_id": int(query)}
             ))
     return list(db.books.find(
-            { "$or": [{"title": query}, {"original_title": query}] }
+            { 
+                "$or": [
+                    {"title": { "$regex": query, "$options": "i" }}, 
+                    {"original_title": { "$regex": query, "$options": "i" }}
+                ] 
+            }
         ))
 
 

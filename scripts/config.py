@@ -31,3 +31,7 @@ SPLIT_F6 = 0.90
 # --- F1 : livres similaires ---
 # Nombre minimum de tags en commun pour considérer deux livres comme similaires
 MIN_SHARED_TAGS = 10
+
+# --- F2 : similarité utilisateurs ---
+# Nombre minimum de livres en commun pour pour pouvoir évaluer les similarité entre deux utilisateurs
+MIN_SHARED_BOOKS = 5
