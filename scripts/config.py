@@ -67,3 +67,26 @@ F3_SEEDS = 10
 F3_SIMILAR_PER_SEED = 10
 # Nombre de recommandations affichées par défaut
 F3_LIMIT = 10
+
+# --- F4 : chemins entre deux livres ---
+# Livres "carrefours" : les F4_HUB_BOOKS livres aimés par le plus de lecteurs ne servent pas d'intermédiaires
+F4_HUB_BOOKS = 100
+# Lecteurs très actifs : la part F4_ACTIVE_READERS des lecteurs ayant aimé le plus de livres n'est pas utilisée
+F4_ACTIVE_READERS = 0.05
+# Une étape (livre -> livre) est convaincante si au moins MIN_SHARED_READERS lecteurs ont aimé les deux livres
+# et si ce nombre est au moins F4_MIN_LIFT fois plus grand que le hasard
+F4_MIN_LIFT = 1.5
+# Recherche à 3 étapes : nombre de voisins du premier livre explorés
+F4_EXPAND = 20
+# Nombre de chemins affichés par défaut
+F4_LIMIT = 5
+
+# --- F5 : liens entre deux centres d'intérêt (tags) ---
+# Un lecteur "aime" un tag s'il a aimé au moins F5_MIN_LIKED livres portant ce tag
+# ET plus de livres de ce tag que la moyenne des lecteurs
+F5_MIN_LIKED = 3
+# Le lien entre deux tags est fort si les deux groupes de lecteurs se recoupent F5_MIN_LIFT fois plus que le hasard
+F5_MIN_LIFT = 1.5
+# Nombre de livres pont affichés par défaut, et nombre d'exemples de lecteurs
+F5_LIMIT = 10
+F5_EXAMPLES = 3
