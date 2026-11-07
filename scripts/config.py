@@ -29,9 +29,29 @@ SPLIT_INITIAL = 0.80
 SPLIT_F6 = 0.90
 
 # --- F1 : livres similaires ---
-# Nombre minimum de tags en commun pour considérer deux livres comme similaires
-MIN_SHARED_TAGS = 10
+# Un tag porté par plus de COMMON_TAG_RATIO des livres est "très fréquent" (to-read, favorites, owned...)
+COMMON_TAG_RATIO = 0.5
+# Note minimale pour considérer qu'un lecteur a "aimé" un livre
+LIKE_MIN_RATING = 4
+# Nombre minimum de lecteurs ayant aimé les deux livres pour parler de lectorat partagé
+MIN_SHARED_READERS = 3
+# Poids des deux composantes du score (thématique / lecteurs), et bonus catalogue
+WEIGHT_TAGS = 0.5
+WEIGHT_READERS = 0.5
+AUTHOR_BONUS = 0.3   # même auteur : bonus "assez gros"
+YEAR_BONUS = 0.1     # année de publication proche : bonus "moyen", dégressif
+YEAR_WINDOW = 5      # écart maximal (en années) donnant droit au bonus d'année
+# Nombre de résultats affichés par défaut
+F1_LIMIT = 10
 
 # --- F2 : similarité utilisateurs ---
 # Nombre minimum de livres en commun pour pour pouvoir évaluer les similarité entre deux utilisateurs
 MIN_SHARED_BOOKS = 5
+
+# --- F3 : recommandations ---
+# Nombre de livres les mieux notés du lecteur sur lesquels on lance F1 (livres "graines")
+F3_SEEDS = 10
+# Nombre de livres similaires récupérés par F1 pour chaque graine
+F3_SIMILAR_PER_SEED = 10
+# Nombre de recommandations affichées par défaut
+F3_LIMIT = 10
