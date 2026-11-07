@@ -35,3 +35,15 @@ MIN_SHARED_TAGS = 10
 # --- F2 : similarité utilisateurs ---
 # Nombre minimum de livres en commun pour pour pouvoir évaluer les similarité entre deux utilisateurs
 MIN_SHARED_BOOKS = 5
+GENRES = {
+    "fantasy": ["fantasy"],
+    "science-fiction": ["science-fiction", "sci-fi"],
+    "romance": ["romance", "romantic"],
+    "mystery": ["mystery", "mysteries"],
+    "thriller": ["thriller"],
+    "horror": ["horror"],
+    "historical": ["historical-fiction", "historical"],
+    "adventure": ["adventure"],
+    "young-adult": ["young-adult", "ya"],
+    "dystopia": ["dystopia", "dystopian"]
+}
