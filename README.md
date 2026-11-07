@@ -31,6 +31,22 @@ Si plusieurs livres ont le même titre, le script les liste avec leur `book_id` 
 Un argument composé uniquement de chiffres est toujours interprété comme un `book_id`.
 
 
+## F2
+
+
+
+## F3 : recommandations pour un lecteur
+
+```bash
+python f3.py 20000                 # recommandations pour le lecteur 20000
+python f3.py 20000 --limit 20      # nombre de recommandations (10 par défaut)
+python f3.py 20000 --truncate 5    # historique réduit aux 5 premières notes du lecteur
+```
+
+Les 10 livres les mieux notés du lecteur (note ≥ 4) sont envoyés à F1 ; chaque livre similaire non noté gagne +1 à chaque apparition.
+Chaque recommandation indique les livres du lecteur qui l'ont fait apparaître, et la sortie se termine par l'écart à la popularité (part dans le top 100 des livres les plus notés, popularité médiane).
+
+
 ## Info des données
 
 ratings : 
