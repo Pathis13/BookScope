@@ -34,12 +34,12 @@ Un argument composé uniquement de chiffres est toujours interprété comme un `
 ## F2
 
 ```bash
-python f2.py 20000 20028           # comparer les similitude entre l'utilisateur 20000 et 20028
+python f2.py 20000 20028           # comparer les similarités entre l'utilisateur 20000 et 20028
 ```
 
-Les livres en commun ont leurs notes comparés pour définir un score de similarité des notes.
+Les livres en commun ont leurs notes comparées pour définir un score de similarité des notes.
 
-Les livre notés par les utilisateur sont placé dans des genre en fonction de leurs genres, ce qui permet de donner un score et de calculer la similarité par genre. 
+Les livres notés par les utilisateurs sont placés dans des genres en fonction de leurs genres, ce qui permet de donner un score et de calculer la similarité par genre.
 
 ## F3 : recommandations pour un lecteur
 

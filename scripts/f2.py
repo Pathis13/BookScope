@@ -1,7 +1,7 @@
 # F2 : Trouver les similarités entre deux utilisateurs
 #
 # Usage (depuis scripts/) :
-#   python f2.py 20000 20028    (comparer les similitude entre l'utilisateur 20000 et 20028)
+#   python f2.py 20000 20028    (comparer les similarités entre l'utilisateur 20000 et 20028)
 
 import sys
 from math import sqrt
