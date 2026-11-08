@@ -15,12 +15,15 @@ def get_user_tags(db, user_id):
     pipeline = [
         # 1. Récupérer les notes de l'utilisateur
         {"$match": {"user_id": user_id}},
-        # 2. Relier ratings.book_id à books.work_id
+        # 2. Relier ratings.book_id à books.book_id
+        # Correction : la jointure se faisait sur books.work_id, un autre identifiant. Seules quelques notes
+        # trouvaient un livre par coïncidence numérique (1 sur 91 pour le lecteur 20000), et la similarité des
+        # genres était calculée sur presque rien (docs/Pieges.md, point 2).
         {
             "$lookup": {
                 "from": "books",
                 "localField": "book_id",
-                "foreignField": "work_id",
+                "foreignField": "book_id",
                 "as": "book",
             }
         },

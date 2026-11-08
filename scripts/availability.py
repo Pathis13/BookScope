@@ -87,11 +87,11 @@ def check(db, service, readers=(), needs_all=False):
         print(f"  catalogue (books, tags, book_tags) : stocké sur {primary} -> INACCESSIBLE")
         missing = True
     if needs_all:
-        print(f"  ce service lit aussi les notes de tous les lecteurs (livres similaires) : une partie est sur "
-              f"{', '.join(down)}")
+        print(f"  ce service a besoin des notes de tous les lecteurs (F3 : livres similaires ; F6 : lot à écrire) : "
+              f"une partie est sur {', '.join(down)}")
         missing = True
     if missing:
-        print(f"ÉCHEC de {service} : aucun résultat n'est affiché, il serait calculé sur une partie seulement "
+        print(f"ÉCHEC de {service} : rien n'est calculé ni écrit, le résultat ne porterait que sur une partie "
               f"des données.")
         return False
     print(f"  Toutes les données nécessaires à {service} sont sur des instances joignables : le résultat "

@@ -91,7 +91,7 @@ Il a fallu une petite modification du code pour en profiter : les projections de
 |---|---|---|---|---|
 | Lecteurs ayant aimé le livre 1 | 5 ms | 3 ms | `FETCH > IXSCAN` → `PROJECTION_COVERED > IXSCAN` | 3 998 → **0** |
 | Notes du lecteur 20000 | < 1 ms | < 1 ms | `FETCH > IXSCAN` → `PROJECTION_COVERED > IXSCAN` | 91 → **0** |
-| Livres aimés par les lecteurs du livre 1 | 242 ms | **71 ms** (−71 %) | `GROUP > FETCH > IXSCAN` → `GROUP > PROJECTION_COVERED > IXSCAN` | 308 065 → **0** |
+| Livres aimés par les lecteurs du livre 1 | 236 ms | **70 ms** (−70 %) | `GROUP > FETCH > IXSCAN` → `GROUP > PROJECTION_COVERED > IXSCAN` | 308 065 → **0** |
 
 Le nombre de clés examinées baisse aussi (de 3 998 à 3 360, et de 313 614 à 230 690). Comme `rating` fait partie de l'index, la condition `rating >= 4` limite directement la plage lue au lieu de filtrer après coup.
 
@@ -99,28 +99,30 @@ Le nombre de clés examinées baisse aussi (de 3 998 à 3 360, et de 313 614 à 
 
 | Service | base | covering | Gain | Écart-type base / covering |
 |---|---|---|---|---|
-| F1 (livre 1) | 2,78 s | 1,61 s | −42 % | 0,06 / 0,06 s |
-| F2 (20000 / 22534) | 0,47 s | 0,46 s | −3 % | 0,005 / 0,003 s |
-| F3 (lecteur 20000) | 14,79 s | 9,41 s | −36 % | 0,09 / 0,04 s |
-| F4 (1 → 5000) | 1,10 s | 0,43 s | −62 % | 0,02 / 0,009 s |
-| F5 (fantasy / romance) | 4,47 s | 1,61 s | −64 % | 0,11 / 0,03 s |
+| F1 (livre 1) | 2,71 s | 1,50 s | −45 % | 0,02 / 0,02 s |
+| F2 (20000 / 22534) | 0,094 s | 0,093 s | −2 % | 0,001 / 0,001 s |
+| F3 (lecteur 20000) | 14,52 s | 8,83 s | −39 % | 0,11 / 0,15 s |
+| F4 (1 → 5000) | 1,07 s | 0,42 s | −61 % | 0,008 / 0,004 s |
+| F5 (fantasy / romance) | 4,28 s | 1,59 s | −63 % | 0,04 / 0,009 s |
 
-F2 ne gagne presque rien : sa lecture de `ratings` (livres communs, 7 ms) était déjà rapide. Son temps est presque entièrement dans `get_user_tags`, la jointure notes → livres → tags, que les index de `ratings` ne touchent pas.
+F2 ne gagne presque rien : sa lecture de `ratings` (livres communs, 7 ms) était déjà rapide. Son temps est presque entièrement dans `get_user_tags`, la jointure notes → livres → tags, qui passe par les index de `books` et `book_tags`, pas par ceux de `ratings`. Ces mesures sont faites avec la jointure corrigée (voir l'anomalie de F2 plus bas) : F2 prend 0,09 s, contre 0,46 s avant la correction.
 
 **Coûts**
 
 | Coût | base | covering |
 |---|---|---|
-| Taille totale des index de `ratings` | 23,3 Mo | 43,2 Mo (+85 %, +19,9 Mo) |
-| Création des deux index | — | 2,1 s |
-| Insertion du lot F6 (112 863 notes) | 0,86 s | 1,21 s (+41 %) |
+| Taille totale des index de `ratings` | 34,1 Mo | 54,0 Mo (+58 %, +19,9 Mo) |
+| Création des deux index | — | 2,0 s |
+| Insertion du lot F6 (112 863 notes) | 0,88 s | 1,19 s (+35 %) |
+
+La taille des index est plus grande qu'au premier passage de `bench.py` (23,3 → 43,2 Mo à l'époque, 34,1 → 54,0 Mo maintenant), alors que les données sont les mêmes. Entre les deux, l'import est passé de `insert_many` à des upserts (merge de F6). C'est la cause probable : les index sont remplis dans un ordre moins favorable et restent moins compacts. Cela n'a pas été vérifié. Le surcoût des deux index couvrants ne change pas (+19,9 Mo).
 
 ### Compromis et décision : **retenue**
 
 C'est le compromis classique entre la lecture d'un côté, l'écriture et l'espace disque de l'autre. Chaque note est maintenant écrite dans 5 index au lieu de 3.
 
-- **Les lectures** gagnent 36 à 64 % sur F1, F3, F4 et F5. Ce sont des services interactifs, utilisés pendant la démonstration. F2 n'est ni accéléré ni ralenti.
-- **Les écritures** ne se font que par lots, avec F6 et l'import : 0,35 s de plus pour un lot de 113 000 notes.
+- **Les lectures** gagnent 39 à 63 % sur F1, F3, F4 et F5. Ce sont des services interactifs, utilisés pendant la démonstration. F2 n'est ni accéléré ni ralenti.
+- **Les écritures** ne se font que par lots, avec F6 et l'import : 0,31 s de plus pour un lot de 113 000 notes.
 - **L'espace** supplémentaire est de 20 Mo, négligeable ici.
 
 Les deux index sont donc ajoutés à `import_data.py`. `bench.py` laisse aussi cette configuration en place à la fin, sauf avec `--keep base`.
@@ -132,7 +134,7 @@ Conséquence : `book_id_1` devient redondant, puisque c'est le début de `book_r
 - **Base toujours en mémoire.** Les données tiennent dans le cache de 15 Go. Le premier appel après un changement d'index (« froid ») n'est donc presque pas plus lent qu'un appel « chaud ». Une vraie mesure à froid demanderait de redémarrer `mongod` avant chaque série.
 - **Client et serveur sur la même machine.** Ils partagent processeur, mémoire et disque.
 - **Une seule entrée par service.** Le livre 1 est le cas le plus lourd pour F1 et F4 ; un livre peu aimé donnerait des gains absolus plus faibles.
-- **Le reste du temps n'est pas dans les index.** Ce qui reste dans F3 (9,4 s) vient surtout des 10 appels à F1 et des agrégations globales, qui lisent toute la collection quels que soient les index.
+- **Le reste du temps n'est pas dans les index.** Ce qui reste dans F3 (8,8 s) vient surtout des 10 appels à F1 et des agrégations globales, qui lisent toute la collection quels que soient les index.
 
 ### Anomalie trouvée dans F2 : jointure sur `work_id`
 
@@ -142,10 +144,10 @@ Mesure de `get_user_tags` sur les deux lecteurs de référence, jointure actuell
 
 | Jointure | Temps (2 lecteurs) | Tags trouvés (20000 / 22534) | Similarité par tags |
 |---|---|---|---|
-| `work_id` (actuel) | 0,46 s | 100 / 284 | 67,21 |
+| `work_id` (avant) | 0,46 s | 100 / 284 | 67,21 |
 | `book_id` (corrigé) | **0,09 s** | 1 420 / 1 583 | 98,42 |
 
-La correction rend F2 environ 5 fois plus rapide, parce que `books.book_id` est indexé : il n'y a plus de lecture complète de `books`. Surtout, elle **change le résultat**. Cette correction relève de la personne qui écrit F2 ; les mesures de F2 du tableau ci-dessus sont celles de la version actuelle.
+La correction rend F2 environ 5 fois plus rapide, parce que `books.book_id` est indexé : il n'y a plus de lecture complète de `books`. Surtout, elle **change le résultat**. La correction a depuis été appliquée dans `f2.py`, et les tableaux ci-dessus ont été remesurés avec la version corrigée.
 
 ### Alternatives écartées sans implémentation
 
@@ -174,6 +176,7 @@ Attention pour F6 : relancer `import_data.py` efface les notes ajoutées par F6 
 
 - [ ] Rédiger la section du rapport à partir de ce document : modèle, tableau des requêtes et index, mesures, décision.
 - [ ] Prévenir la personne qui fait F6 : l'insertion est environ 40 % plus lente avec les index couvrants, et l'import remet la base à zéro.
-- [ ] Corriger la jointure `work_id` → `book_id` de F2, puis relancer `bench.py`.
+- [x] Corriger la jointure `work_id` → `book_id` de F2.
+- [x] Relancer `bench.py` pour mettre à jour les mesures de F2.
 - [ ] (Optionnel) Mesurer la suppression de `book_id_1`.
 - [ ] (Optionnel) Refaire une série à froid en redémarrant `mongod`, et mesurer F1 et F4 sur un livre peu aimé.

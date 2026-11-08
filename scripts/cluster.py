@@ -94,6 +94,11 @@ def start_shard(i):
         print(f"  shard{i}RS déjà lancé (port {port})")
         return
     data.mkdir(parents=True, exist_ok=True)
+    # Juste après stop-shard, le port ne répond plus mais mongod n'a pas encore libéré son verrou : relancé
+    # trop tôt, le nouveau processus s'arrête aussitôt. mongod vide mongod.lock à la fin de son arrêt.
+    lock, t = data / "mongod.lock", time.time()
+    while lock.exists() and lock.stat().st_size > 0 and time.time() - t < 30:
+        time.sleep(0.5)
     spawn(f"shard{i}", [exe("mongod"), "--shardsvr", "--replSet", f"shard{i}RS", "--dbpath", str(data),
                         "--port", str(port), "--bind_ip", "localhost"])
     wait_up(port)

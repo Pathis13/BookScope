@@ -7,9 +7,9 @@ La plupart de ces erreurs **ne provoquent aucun message d'erreur**. Le script s'
 | # | Piège | Conséquence | État |
 |---|---|---|---|
 | 1 | `_id` présent dans la projection | Index couvrant inutilisé | Corrigé (f1, f4) |
-| 2 | Jointure F2 sur `work_id` au lieu de `book_id` | Similarité des genres calculée sur ~1 % des notes | **Non corrigé** (attend l'accord du binôme) |
+| 2 | Jointure F2 sur `work_id` au lieu de `book_id` | Similarité des genres calculée sur ~1 % des notes | Corrigé (f2) |
 | 3 | `bulk_write(ordered=True)` via `mongos` | Import à ~80 documents/s sur le cluster | Corrigé (import_data) |
-| 4 | `_id` créé par les shards lors d'un upsert | Ordre chronologique perdu, F3 différent | Corrigé (import_data), **à reporter dans f6** |
+| 4 | `_id` créé par les shards lors d'un upsert | Ordre chronologique perdu, F3 différent | Corrigé (import_data, f6) |
 | 5 | Client tué, opération toujours active sur le serveur | Collection recréée non répartie | Procédure ci-dessous |
 | 6 | Index unique sans la clé de répartition en tête | Création d'index refusée sur le cluster | Corrigé (import_data) |
 | 7 | Doublons de `book_tags` : garder le premier ou le dernier | Deux comptes de tags changent | Documenté |
@@ -17,7 +17,8 @@ La plupart de ces erreurs **ne provoquent aucun message d'erreur**. Le script s'
 | 9 | Relancer `import_data.py` | Efface les notes ajoutées par F6 | Mise en garde |
 | 10 | Données préparées modifiées sans tout réimporter | Comparaison local / cluster faussée | Mise en garde |
 | 11 | Deux réécritures parallèles du même fichier | Conflit de merge | Résolu |
-| 12 | Encodage de la console Windows | Accents illisibles dans la sortie | Mise en garde |
+| 12 | Encodage de la console Windows | Accents illisibles dans la sortie | Corrigé (f6), reste prepare_data |
+| 13 | Shard relancé juste après son arrêt | Le shard ne redémarre pas | Corrigé (cluster.py) |
 
 ---
 
@@ -48,7 +49,7 @@ db.ratings.find({"book_id": b, "rating": {"$gte": 4}}, {"_id": 0, "user_id": 1})
 "foreignField": "work_id",    # devrait être "book_id"
 ```
 
-**Correction proposée (non appliquée).** Remplacer par `"foreignField": "book_id"`. Testée hors du fichier : F2 passe de 0,46 s à 0,09 s, et la similarité des genres de 67,21 à 98,42 pour la paire 20000 / 22534. **f2.py appartient au binôme : à valider avant de modifier.** Il faudra ensuite relancer `bench.py` et `compare.py`.
+**Correction appliquée.** `"foreignField": "book_id"`, avec un commentaire dans `f2.py`. Pour la paire 20000 / 22534, la similarité des genres passe de 67,21 à 98,42, et la similarité globale de 74,56 à 87,05. F2 est aussi environ 5 fois plus rapide (0,46 s → 0,09 s), parce que `books.book_id` est indexé. `bench.py` a été relancé avec la version corrigée.
 
 **Comment le repérer.** Compter les documents juste après le `$unwind` qui suit le `$lookup`, et comparer au nombre de notes du lecteur. Un `$unwind` élimine en silence les documents sans correspondance.
 
@@ -85,7 +86,7 @@ UpdateOne(identity, {"$setOnInsert": {"_id": ObjectId(), **document}}, upsert=Tr
 
 **Vérifié.** Après réimport des trois bases, `compare.py` donne de nouveau 26/26 comparaisons identiques.
 
-**À reporter dans `f6.py`.** F6 laisse aussi le serveur créer les `_id` des nouvelles notes (`$set` avec `upsert=True`). Sur le cluster réparti par livre, l'ordre entre ces nouvelles notes peut être faux, ce qui fausserait F3 lancé après F6. Même correction : `{"$set": document, "$setOnInsert": {"_id": ObjectId()}}`.
+**Même correction dans `f6.py`.** F6 laissait aussi le serveur créer les `_id` des nouvelles notes (`$set` avec `upsert=True`). Sur le cluster réparti par livre, l'ordre entre ces nouvelles notes aurait été faux, ce qui fausse F3 lancé après F6. Corrigé avec `{"$set": document, "$setOnInsert": {"_id": ObjectId()}}`.
 
 **Leçon plus générale.** S'appuyer sur `_id` pour l'ordre est fragile. Un champ explicite (position dans l'historique, ou date) serait plus robuste. Goodbooks-10k n'a pas de date, donc l'ordre des lignes est la seule information chronologique disponible.
 
@@ -201,7 +202,17 @@ Sous Windows, la console n'utilise pas UTF-8 par défaut. Les accents apparaisse
 sys.stdout.reconfigure(encoding="utf-8")
 ```
 
-`prepare_data.py` ne le fait pas encore.
+`f6.py` ne le faisait pas : ses lignes accentuées étaient illisibles dès que la sortie passait dans un pipe. Corrigé. `prepare_data.py` ne le fait pas encore.
+
+---
+
+## 13. Shard relancé juste après son arrêt
+
+**Symptôme.** `python cluster.py stop-shard 2` suivi immédiatement de `start-shard 2` : le nouveau processus s'arrête aussitôt (« Le processus du port 27302 ne répond pas »). Le même `start-shard`, relancé quelques secondes plus tard, fonctionne.
+
+**Cause.** `stop-shard` attend que le port ne réponde plus. Mais `mongod` finit encore son arrêt (écriture sur disque, puis libération du verrou `mongod.lock`). Lancé pendant ce temps, le nouveau `mongod` trouve le dossier de données verrouillé et s'arrête.
+
+**Correction.** Avant de lancer le shard, `start_shard` attend que `mongod.lock` soit vide (`mongod` le vide à la fin de son arrêt), pendant 30 s au maximum.
 
 ---
 

@@ -64,7 +64,7 @@ Temps d'un appel, mesuré par `compare.py` (une seule exécution, donc indicatif
 |---|---|---|---|
 | F1 (livre 1) | 1,51 s | 9,24 s | 4,95 s |
 | F1 (livre 9000) | 0,67 s | 1,03 s | 1,07 s |
-| F2 (20000 / 22534) | 0,45 s | 0,65 s | 0,63 s |
+| F2 (20000 / 22534), après correction de la jointure | 0,11 s | 0,15 s | 0,16 s |
 | F3 (lecteur 20000) | 8,84 s | 26,82 s | 19,26 s |
 | F3 (lecteur 20000, 5 notes) | 4,12 s | 15,52 s | 9,96 s |
 | F4 (1 → 5000) | 0,45 s | 0,90 s | 0,91 s |
@@ -130,9 +130,10 @@ Résultats avec shard2RS arrêté (placement par lecteur) :
 | Commande | Ce que reçoit l'utilisateur |
 |---|---|
 | `python f2.py 20000 22534` (20000 sur shard2RS, 22534 sur shard1RS) | **Échec explicite** : « notes du lecteur 20000 : stockées sur shard2RS -> INACCESSIBLES ; notes du lecteur 22534 : accessibles ; ÉCHEC de F2 : aucun résultat n'est affiché, il serait calculé sur une partie seulement des données. » |
-| `python f2.py 22534 29999` (les deux sur shard1RS) | Résultat **complet**, annoncé comme tel. Il est identique au déploiement local (similarité 73,73, 29 livres communs). |
+| `python f2.py 22534 29999` (les deux sur shard1RS) | Résultat **complet**, annoncé comme tel. Il est identique au déploiement local (similarité 80,21, 29 livres communs, après la correction de F2). |
 | `python f3.py 29999` (historique sur shard1RS, complet) | **Échec explicite** : l'historique du lecteur est accessible, mais les livres similaires (F1) ont besoin des notes de tous les lecteurs, dont la moitié est sur shard2RS. |
 | `python f3.py 20000` (historique sur shard2RS) | **Échec explicite** : historique inaccessible, et F1 aussi. |
+| `python f6.py` (le lot touche des lecteurs des deux shards) | **Échec explicite, rien n'est écrit**, en 2 s (code de retour 2). Sans cette vérification, avec `ordered=False`, les notes destinées à shard1RS seraient écrites et les autres non : un lot appliqué à moitié. |
 | Placement par livre : `f2.py 22534 29999` | **Échec explicite** : les notes de chaque lecteur sont sur les deux shards, et le catalogue est sur shard2RS. |
 
 F3 aurait pu renvoyer des recommandations calculées sur la moitié des lecteurs avec un avertissement. Nous avons préféré l'échec explicite, plus simple à vérifier et sans risque de mauvaise interprétation.
@@ -168,7 +169,12 @@ python cluster.py stop                                    # arrêt ; reset = arr
 
 ## Ce qu'il reste à faire
 
-- [ ] F6 : script doit accepter `BOOKSCOPE_URI` (il suffit d'importer `MONGO_URI` et `DATABASE_NAME` de `config.py`) et être testé sur le cluster. L'identité d'une note `(user_id, book_id)` est compatible avec la clé de répartition.
-- [ ] Corriger F2 (`work_id` → `book_id`), puis relancer `compare.py`.
+- [x] F6 sur le cluster. `f6.py` utilise déjà `MONGO_URI` et `DATABASE_NAME` de `config.py`, donc il accepte `BOOKSCOPE_URI` (et `BOOKSCOPE_DB`). Testé sur les trois bases (local, cluster par lecteur, cluster par livre) :
+  - premier passage : les 112 863 notes du lot sont insérées, la base passe à 1 015 896 notes ;
+  - second passage : 0 insérée, 0 modifiée, 112 863 identiques (le lot peut être rejoué sans effet) ;
+  - avec shard2RS arrêté : échec explicite avant toute écriture (section 6).
+
+  Modifications de `f6.py` : `_id` créé côté client pour garder l'ordre chronologique utilisé par F3 (`docs/Pieges.md`, point 4), `ordered=False` (point 3), vérification de disponibilité, compteur « notes déjà identiques » corrigé (il comptait aussi les notes modifiées), sortie en UTF-8.
+- [x] Corriger F2 (`work_id` → `book_id`), puis relancer `compare.py`.
 - [ ] (Optionnel) Tester et mesurer la configuration à 3 shards (Lab 5, partie 7), en observant les migrations de chunks.
 - [ ] Rédiger la section du rapport ; les mesures répétées (moyenne, variabilité, état du cache) relèvent de l'expérience E2.
