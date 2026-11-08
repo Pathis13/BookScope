@@ -1,8 +1,8 @@
 # Benchmark E1 de BookScope.
-# 
-# Le script mesure les statistiques de la base et les latences des fonctions F1 à F4.
+#
+# Le script mesure les statistiques de la base et les latences des fonctions F1 à F5.
 # Il effectue une exécution de chauffe, non comptabilisée, avant les répétitions.
-# 
+#
 # Usage (depuis scripts/) :
 #     python benchmark_e1.py --db bookscope_e1_250k --repeats 5
 #     python benchmark_e1.py --db bookscope_e1_500k --repeats 5
@@ -21,6 +21,7 @@ import f1
 import f2
 import f3
 import f4
+import f5
 from config import MONGO_URI, MONGO_TIMEOUT_MS, F1_LIMIT, F3_LIMIT, F4_LIMIT
 
 
@@ -124,6 +125,25 @@ def choose_f4_books(db):
     return by_id[rows[0]["_id"]], by_id[rows[1]["_id"]]
 
 
+def choose_f5_tags(db):
+    # Deux tags parmi les plus représentés, sélectionnés de façon déterministe.
+    rows = list(db.book_tags.aggregate([
+        {"$group": {"_id": "$tag_id", "n": {"$sum": 1}}},
+        {"$sort": {"n": -1, "_id": 1}},
+        {"$limit": 20},
+    ]))
+    selected = []
+    for row in rows:
+        tag = db.tags.find_one({"tag_id": row["_id"]})
+        if tag and tag.get("tag_name"):
+            selected.append(tag)
+        if len(selected) == 2:
+            break
+    if len(selected) < 2:
+        raise RuntimeError("Il faut au moins deux tags valides pour mesurer F5.")
+    return selected[0], selected[1]
+
+
 def database_stats(db):
     stats = db.command("dbStats", scale=1024 * 1024)
     return {
@@ -146,6 +166,7 @@ def main():
     parser.add_argument("--repeats", type=int, default=5, help="Nombre de répétitions mesurées")
     parser.add_argument("--output", default="../results/e1_measurements.csv", help="CSV de sortie")
     parser.add_argument("--skip-f4", action="store_true", help="Ne pas mesurer F4 (requête potentiellement coûteuse)")
+    parser.add_argument("--skip-f5", action="store_true", help="Ne pas mesurer F5 (calcul potentiellement coûteux)")
     args = parser.parse_args()
 
     if args.repeats < 2:
@@ -203,6 +224,15 @@ def main():
                 args.repeats,
             ))
             print(f"F4 books   : {book_a['book_id']}, {book_b['book_id']}")
+
+        if not args.skip_f5:
+            tag_a, tag_b = choose_f5_tags(db)
+            measurements.append(measure(
+                "F5_tag_link (calcul complet)",
+                lambda: f5.tag_link(db, tag_a, tag_b),
+                args.repeats,
+            ))
+            print(f"F5 tags    : {tag_a['tag_name']}, {tag_b['tag_name']}")
 
         print("\n=== Latences (ms) ===")
         for row in measurements:
