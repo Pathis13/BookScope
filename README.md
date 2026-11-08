@@ -47,6 +47,32 @@ Les 10 livres les mieux notés du lecteur (note ≥ 4) sont envoyés à F1 ; cha
 Chaque recommandation indique les livres du lecteur qui l'ont fait apparaître, et la sortie se termine par l'écart à la popularité (part dans le top 100 des livres les plus notés, popularité médiane).
 
 
+## Mesures (Part I)
+
+```bash
+python bench.py                    # index d'origine vs index couvrants sur ratings, 5 répétitions
+python bench.py --reps 10 --keep base
+```
+
+Résultats dans `results/` ; analyse dans [docs/LocalPrototype.md](docs/LocalPrototype.md).
+
+
+## Déploiement distribué (Part II)
+
+Cluster MongoDB local construit comme dans le Lab 5 : serveur de configuration (27200), 2 shards (27301, 27302), routeur mongos (27400). Les notes sont réparties par lecteur (`{user_id: "hashed"}`).
+
+```bash
+python cluster.py start                                   # lance et initialise le cluster
+python import_data.py --uri mongodb://localhost:27400/    # import réparti
+python compare.py                                         # résultats identiques local / cluster ?
+python dist_explain.py                                    # shards contactés pour 3 types de requêtes
+python cluster.py stop-shard 2                            # perte d'une instance (start-shard 2 pour relancer)
+python cluster.py stop
+```
+
+Pour lancer un service sur le cluster : `BOOKSCOPE_URI=mongodb://localhost:27400/ python f2.py 20000 22534` (PowerShell : `$env:BOOKSCOPE_URI = "mongodb://localhost:27400/"`). Détails et mesures dans [docs/DistributedPrototype.md](docs/DistributedPrototype.md).
+
+
 ## Info des données
 
 ratings : 

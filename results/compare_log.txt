@@ -1,0 +1,31 @@
+local        : mongodb://localhost:27017/ base bookscope, 903033 notes
+cluster      : mongodb://localhost:27400/ base bookscope, 903033 notes
+cluster_book : mongodb://localhost:27400/ base bookscope_book, 903033 notes
+
+Localisation des enregistrements utilisés :
+  lecteur 20000 -> shard2RS
+  lecteur 22534 -> shard1RS
+  lecteur 26485 -> shard2RS
+  lecteur 29999 -> shard1RS
+  livre 1 -> shard1RS
+  livre 1129 -> shard1RS
+  livre 4000 -> shard1RS
+  livre 5000 -> shard1RS
+  livre 9000 -> shard2RS
+
+service entrée                           local               cluster          cluster_book
+F1      (1,)                référence   1.51 s    identique   9.24 s    identique   4.95 s
+F1      (9000,)             référence   0.67 s    identique   1.03 s    identique   1.07 s
+F1      (1129,)             référence   0.58 s    identique   0.92 s    identique   0.97 s
+F2      (20000, 22534)      référence   0.45 s    identique   0.65 s    identique   0.63 s
+F2      (20000, 26485)      référence   0.37 s    identique   0.52 s    identique   0.55 s
+F3      (20000, None)       référence   8.84 s    identique  26.82 s    identique  19.26 s
+F3      (29999, None)       référence   8.38 s    identique  20.78 s    identique  16.26 s
+F3      (20000, 5)          référence   4.12 s    identique  15.52 s    identique   9.96 s
+F4      (1, 5000)           référence   0.45 s    identique   0.90 s    identique   0.91 s
+F4      (9000, 4000)        référence   0.37 s    identique   0.76 s    identique   0.79 s
+F4      (1129, 1)           référence   0.42 s    identique   0.86 s    identique   0.90 s
+F5      (11305, 26138)      référence   1.58 s    identique   2.93 s    identique   3.14 s
+F5      (31745, 22973)      référence   1.04 s    identique   2.15 s    identique   2.15 s
+
+26/26 comparaisons identiques. Rapport : results/compare_report.csv

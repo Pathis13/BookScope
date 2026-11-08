@@ -1,16 +1,24 @@
 # Configuration partagée de BookScope (importée par les scripts de ce dossier)
 
+import os
 from pathlib import Path
 
 # --- MongoDB ---
-MONGO_URI = "mongodb://localhost:27017/"
-DATABASE_NAME = "bookscope"
+# Déploiement utilisé par les scripts : local par défaut, ou le cluster distribué (Part II) avec
+#   BOOKSCOPE_URI=mongodb://localhost:27400/   (routeur mongos)
+#   BOOKSCOPE_DB=bookscope_book                (placement alternatif, par livre)
+LOCAL_URI = "mongodb://localhost:27017/"
+CLUSTER_URI = "mongodb://localhost:27400/"
+MONGO_URI = os.environ.get("BOOKSCOPE_URI", LOCAL_URI)
+DATABASE_NAME = os.environ.get("BOOKSCOPE_DB", "bookscope")
 MONGO_TIMEOUT_MS = 5000
 
 # --- Dossiers de données (relatifs à la racine du projet, quel que soit le dossier de lancement) ---
 ROOT = Path(__file__).resolve().parent.parent
 ORIGINAL = ROOT / "data" / "goodbooks-10k"   # CSV Goodbooks-10k d'origine
 PROCESSED = ROOT / "data" / "processed"      # CSV produits par prepare_data.py
+
+CLUSTER_DATA = ROOT / "data" / "cluster"     # dossiers de données et journaux du cluster (Part II)
 
 # Fichiers produits par prepare_data.py
 RATINGS_INITIAL = PROCESSED / "ratings_initial.csv"

@@ -29,16 +29,16 @@ Auteur / Année de sortie ajouterai un bonus de similarité (assez gros pour l'a
 **Recherche du livre** : si l'entrée ne contient que des chiffres, c'est un `book_id`. Sinon on cherche le texte dans `title` et `original_title`.
 Si plusieurs livres correspondent, on les liste tous avec leur `book_id` au lieu d'en choisir un. On affiche ensuite la fiche : auteurs, année, note Goodreads, nombre de notes et moyenne dans notre base, série, tags principaux.
 
-**Titre / série** --> `parse_series`, `series_books`
+**Titre / série** --> `parse_series`, source 3 de `similar_books`
 Dans `books.csv` la série est écrite dans le titre : `Catching Fire (The Hunger Games, #2)`. On lit le nom de la série entre parenthèses (un titre peut en citer plusieurs, séparées par `;`), puis on cherche les livres dont le titre contient `(<série>, #`. Les autres tomes sont classés en tête.
 
-**Tags** --> `tag_profile`, `tag_candidates`
+**Tags** --> `tag_profile`, source 1 de `similar_books`
 Des deux options, on a gardé la pondération par rareté, qui ne demande pas de choisir les tags à la main :
 - pour chaque tag du livre on compte `df`, le nombre de livres qui le portent, et on calcule `idf = log(N / df)` (N = 10 000 livres). `to-read`, porté par 99,8 % des livres, a un idf proche de 0,un tag rare a un idf élevé
 - un tag porté par plus de 50 % des livres (`COMMON_TAG_RATIO`) est classé « très fréquent » (to-read, favorites, owned, kindle, fiction…). Il ne sert pas à trouver des livres : il est seulement affiché comme contexte
 - `score_tags` = somme des idf des tags communs / somme des idf des tags du livre. C'est la part du poids thématique du livre qu'on retrouve dans l'autre livre, entre 0 et 1.
 
-**Lecteurs** --> `reader_candidates`
+**Lecteurs** --> source 2 de `similar_books`
 On a suivi la deuxième option (lecteurs qui ont aimé le livre), avec deux changements :
 - « aimé » veut dire une note ≥ 4 (`LIKE_MIN_RATING`), pas seulement 5. Avec 5 étoiles seulement, un livre peu populaire n'a presque pas de lecteurs dans notre sélection
 - le filtre « avec des tags similaires » n'est pas appliqué ici. Les tags ont déjà leur propre score, et le sujet demande de distinguer un lien par les lecteurs d'un lien par les tags. Les deux scores sont donc calculés séparément.
@@ -51,14 +51,15 @@ Afin d'éviter l'affichage de best sellers pour chaque livres :
 
 On calcule aussi le **lift** = `co / (nA × nB / nb_lecteurs)` : combien de fois il y a plus de lecteurs communs que si les deux livres étaient aimés au hasard. Il sert de preuve affichée : x1 veut dire que le lien s'explique par la popularité des livres.
 
-**Auteur / année** --> `author_books`, `year_bonus`
+**Auteur / année** --> source 4 de `similar_books`, champ `b_year`
 Les deux bonus prévus sont gardés. Même auteur (au moins un nom commun dans `authors`) : +0,3. Année proche : +0,1 si c'est la même année, de moins en moins jusqu'à 0 au-delà de 5 ans d'écart. Les livres du même auteur font partie des candidats même s'ils n'ont ni tag ni lecteur en commun.
 
 **Score final et classement** --> `similar_books`
+Tout F1 tient dans une seule agrégation (`similar_books`) : chaque source (tags, lecteurs, série, auteurs) produit des livres candidats, réunis avec `$unionWith`, fusionnés par livre (`$group`), puis notés et triés. Les preuves ne sont récupérées (`$lookup`) que pour les livres retenus. `--trace` relance la même requête restreinte au second livre, donc avec le même score que dans la liste.
 `score = 0,5 × score_tags + 0,5 × score_lecteurs + bonus_auteur + bonus_année`
 Tri : tomes de la même série d'abord, puis score décroissant, puis `book_id` en cas d'égalité, pour que l'ordre soit toujours le même (utile pour comparer avec la version distribuée).
 
-**Preuves et nature du lien** --> `add_evidence`, `--trace`
+**Preuves et nature du lien** --> fin du pipeline de `similar_books`, `link_nature`, `--trace`
 Chaque résultat affiche le détail du score, quelques lecteurs communs avec leurs deux notes, les tags spécifiques communs (avec le nombre de livres qui les portent) et, à part, les tags très fréquents communs. Il reçoit aussi une **nature du lien** :
 - `même série`, `même auteur` ;
 - `lectorat partagé` : au moins 3 lecteurs communs et un lift > 1 ;

@@ -1,0 +1,7 @@
+placement,case,label,shards,merge,sent_kb,shards_part,merger_part,results,median_ms,shard2RS_returned,shard2RS_keys,shard1RS_keys,shard1RS_returned
+par lecteur (user_id),1. lecteur,notes du lecteur 20000,1,SINGLE_SHARD,0.1,find,-,91,0.8,91,91,,
+par lecteur (user_id),2. livre,lecteurs ayant aimé le livre 1,2,SHARD_MERGE,0.1,find,fusion des curseurs,3360,4.7,1730,1730,1630,1630
+par lecteur (user_id),"3. parcours, saut 2",livres aimés par les 3360 lecteurs du livre 1,2,router,31.9,$match>$group,$mergeCursors>$group,9407,155.7,8704,120033,112319,8582
+par livre (book_id),1. lecteur,notes du lecteur 20000,2,SHARD_MERGE,0.1,find,fusion des curseurs,91,0.7,49,49,42,42
+par livre (book_id),2. livre,lecteurs ayant aimé le livre 1,1,SINGLE_SHARD,0.1,find,-,3360,3.9,,,3360,3360
+par livre (book_id),"3. parcours, saut 2",livres aimés par les 3360 lecteurs du livre 1,2,router,31.9,$match>$group,$mergeCursors,9407,136.4,4682,107163,126825,4725

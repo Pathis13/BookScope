@@ -10,11 +10,14 @@
 #   python f3.py 20000 --truncate 5     (historique réduit aux 5 premières notes du lecteur)
 
 import argparse
+import contextlib
+import io
 import statistics
 import sys
 
 from pymongo import MongoClient
 
+import availability
 import f1
 from config import (DATABASE_NAME, F3_LIMIT, F3_SEEDS, F3_SIMILAR_PER_SEED, LIKE_MIN_RATING, MONGO_TIMEOUT_MS,
                     MONGO_URI)
@@ -152,11 +155,25 @@ def main():
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=MONGO_TIMEOUT_MS)
     db = client[DATABASE_NAME]
     try:
+        # Cluster (Part II) : refuser de répondre si une instance utile est injoignable (pas de résultat partiel)
+        if not availability.check(db, "F3", readers=[args.user_id], needs_all=True):
+            sys.exit(2)
         if not db.ratings.find_one({"user_id": args.user_id}):
             print(f"Lecteur {args.user_id} inconnu (aucune note dans la base).")
             return
-        res = recommend(db, args.user_id, args.limit, args.truncate)
-        print_report(db, args.user_id, res, args.truncate)
+
+        def compute():
+            # le rapport est préparé en entier avant d'être affiché : une erreur en cours de route n'affiche rien
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                print_report(db, args.user_id, recommend(db, args.user_id, args.limit, args.truncate),
+                             args.truncate)
+            return out.getvalue()
+
+        ok, report = availability.run_or_fail("F3", compute)
+        if not ok:
+            sys.exit(2)
+        print(report, end="")
     finally:
         client.close()
 

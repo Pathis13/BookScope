@@ -1,0 +1,49 @@
+date : 2026-11-08 11:37:05
+machine : Windows-11-10.0.26200-SP0, AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD, 16 threads
+MongoDB 9.0.4 (cache WiredTiger 15.0 Go), Python 3.13.14, pymongo 4.19.0, pandas 3.0.6
+ratings : 903033 documents
+entrées : livre 1, lecteur 20000, F2 (20000, 22534), F4 (1, 5000), F5 tags (11305, 26138)
+
+=== Configuration base
+  création des index ajoutés : 0.00 s ; taille totale des index 23.3 Mo (données 15.8 Mo)
+    _id_                      9.2 Mo
+    user_id_1_book_id_1       8.6 Mo
+    book_id_1                 5.5 Mo
+  écriture du lot F6 (112863 notes) : médiane 0.86 s
+  likers      froid   0.006 s | chaud médiane   0.005 s (écart-type 0.000)  [PROJECTION_SIMPLE>FETCH>IXSCAN / book_id_1 ; clés 3998, docs 3998]
+  user_notes  froid   0.001 s | chaud médiane   0.000 s (écart-type 0.000)  [PROJECTION_SIMPLE>FETCH>IXSCAN / user_id_1_book_id_1 ; clés 91, docs 91]
+  co_liked    froid   0.247 s | chaud médiane   0.242 s (écart-type 0.004)  [GROUP>FETCH>IXSCAN / user_id_1_book_id_1 ; clés 313614, docs 308065]
+  F2          froid   0.480 s | chaud médiane   0.469 s (écart-type 0.005)
+  F1          froid   2.896 s | chaud médiane   2.779 s (écart-type 0.056)
+  F3          froid  14.768 s | chaud médiane  14.788 s (écart-type 0.087)
+  F4          froid   1.091 s | chaud médiane   1.104 s (écart-type 0.021)
+  F5          froid   4.421 s | chaud médiane   4.472 s (écart-type 0.107)
+
+=== Configuration covering
+  création des index ajoutés : 2.13 s ; taille totale des index 43.2 Mo (données 15.8 Mo)
+    _id_                      9.2 Mo
+    user_id_1_book_id_1       8.6 Mo
+    book_id_1                 5.5 Mo
+    book_rating_user          9.8 Mo
+    user_rating_book         10.1 Mo
+  écriture du lot F6 (112863 notes) : médiane 1.21 s
+  likers      froid   0.003 s | chaud médiane   0.003 s (écart-type 0.000)  [PROJECTION_COVERED>IXSCAN / book_rating_user ; clés 3360, docs 0]
+  user_notes  froid   0.001 s | chaud médiane   0.000 s (écart-type 0.000)  [PROJECTION_COVERED>IXSCAN / user_rating_book ; clés 91, docs 0]
+  co_liked    froid   0.083 s | chaud médiane   0.071 s (écart-type 0.002)  [GROUP>PROJECTION_COVERED>IXSCAN / user_rating_book ; clés 230690, docs 0]
+  F2          froid   0.455 s | chaud médiane   0.457 s (écart-type 0.003)
+  F1          froid   1.582 s | chaud médiane   1.606 s (écart-type 0.056)
+  F3          froid   9.420 s | chaud médiane   9.408 s (écart-type 0.038)
+  F4          froid   0.444 s | chaud médiane   0.425 s (écart-type 0.009)
+  F5          froid   1.607 s | chaud médiane   1.609 s (écart-type 0.025)
+
+=== Résultats identiques entre configurations ?
+  likers      oui
+  user_notes  oui
+  co_liked    oui
+  F2          oui
+  F1          oui
+  F3          oui
+  F4          oui
+  F5          oui
+
+Mesures écrites dans D:\Programmes\M2\BookScope\results

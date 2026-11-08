@@ -1,0 +1,13 @@
+date : 2026-11-08 11:37:05
+machine : Windows-11-10.0.26200-SP0, AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD, 16 threads
+MongoDB 9.0.4 (cache WiredTiger 15.0 Go), Python 3.13.14, pymongo 4.19.0, pandas 3.0.6
+ratings : 903033 documents
+entrées : livre 1, lecteur 20000, F2 (20000, 22534), F4 (1, 5000), F5 tags (11305, 26138)
+résultat identique likers : True
+résultat identique user_notes : True
+résultat identique co_liked : True
+résultat identique F2 : True
+résultat identique F1 : True
+résultat identique F3 : True
+résultat identique F4 : True
+résultat identique F5 : True

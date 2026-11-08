@@ -1,6 +1,7 @@
 # Données CSV
 data/goodbooks-10k*/
 data/processed/
+data/cluster/
 
 # Python
 .venv/

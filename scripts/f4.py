@@ -74,7 +74,7 @@ def neighbors(db, book_id, stats, cache):
         return cache[book_id]
     likers = [r["user_id"] for r in db.ratings.find(
         {"book_id": book_id, "rating": {"$gte": LIKE_MIN_RATING}, "user_id": {"$nin": list(stats["active"])}},
-        {"user_id": 1})]
+        {"_id": 0, "user_id": 1})]
     result = {}
     if likers:
         pipeline = [
@@ -181,7 +181,8 @@ def catalogue_link(db, bx, by):
         links.append("même auteur")
     if {s for s, _ in f1.parse_series(bx["title"])} & {s for s, _ in f1.parse_series(by["title"])}:
         links.append("même série")
-    specific = [t for t in f1.shared_tags(db, bx, by, f1.tag_profile(db, bx)) if not t["common"]]
+    px, py = f1.tag_profile(db, bx), f1.tag_profile(db, by)
+    specific = sorted((t for i, t in px.items() if i in py and not t["common"]), key=lambda t: -t["idf"])
     if specific:
         links.append(f"{len(specific)} tags spécifiques communs (ex. {', '.join(t['tag_name'] for t in specific[:3])})")
     return links

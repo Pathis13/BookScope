@@ -4,6 +4,8 @@ import sys
 from math import sqrt
 from pymongo import MongoClient
 
+import availability
+
 from config import DATABASE_NAME, MIN_SHARED_BOOKS, MONGO_TIMEOUT_MS, MONGO_URI, GENRES
 
 def get_user_tags(db, user_id):
@@ -152,10 +154,17 @@ def main():
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=MONGO_TIMEOUT_MS)
     db = client[DATABASE_NAME]
 
-    for nom, valeur in calculate_similarity(db, arg1, arg2).items():
-        print(f"{nom:<20} : {valeur}")
-
+    # Cluster (Part II) : refuser de répondre si les notes d'un des lecteurs sont sur une instance injoignable
+    if not availability.check(db, "F2", readers=[arg1, arg2]):
+        client.close()
+        sys.exit(2)
+    ok, result = availability.run_or_fail("F2", lambda: calculate_similarity(db, arg1, arg2))
     client.close()
+    if not ok:
+        sys.exit(2)
+
+    for nom, valeur in result.items():
+        print(f"{nom:<20} : {valeur}")
 
 if __name__ == "__main__":
     main()

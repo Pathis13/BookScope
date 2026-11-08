@@ -1,0 +1,52 @@
+
+=== Placement par lecteur (user_id) (base bookscope)
+
+1. lecteur : notes du lecteur 20000
+  shards contactés : 1 (shard2RS) ; type de fusion : SINGLE_SHARD
+  requête envoyée à chaque shard : 0.1 Ko
+  travail sur les shards : find
+    shard2RS : 91 clés, 0 documents examinés -> 91 documents renvoyés à mongos
+  travail sur mongos : - -> 91 résultats ; médiane 1 ms
+
+2. livre : lecteurs ayant aimé le livre 1
+  shards contactés : 2 (shard2RS, shard1RS) ; type de fusion : SHARD_MERGE
+  requête envoyée à chaque shard : 0.1 Ko
+  travail sur les shards : find
+    shard2RS : 1730 clés, 0 documents examinés -> 1730 documents renvoyés à mongos
+    shard1RS : 1630 clés, 0 documents examinés -> 1630 documents renvoyés à mongos
+  travail sur mongos : fusion des curseurs -> 3360 résultats ; médiane 5 ms
+
+3. parcours, saut 2 : livres aimés par les 3360 lecteurs du livre 1
+  shards contactés : 2 (shard1RS, shard2RS) ; type de fusion : router
+  requête envoyée à chaque shard : 31.9 Ko
+  travail sur les shards : $match>$group
+    shard1RS : 112319 clés, 0 documents examinés -> 8582 documents renvoyés à mongos
+    shard2RS : 120033 clés, 0 documents examinés -> 8704 documents renvoyés à mongos
+  travail sur mongos : $mergeCursors>$group -> 9407 résultats ; médiane 156 ms
+
+=== Placement par livre (book_id) (base bookscope_book)
+
+1. lecteur : notes du lecteur 20000
+  shards contactés : 2 (shard2RS, shard1RS) ; type de fusion : SHARD_MERGE
+  requête envoyée à chaque shard : 0.1 Ko
+  travail sur les shards : find
+    shard2RS : 49 clés, 0 documents examinés -> 49 documents renvoyés à mongos
+    shard1RS : 42 clés, 0 documents examinés -> 42 documents renvoyés à mongos
+  travail sur mongos : fusion des curseurs -> 91 résultats ; médiane 1 ms
+
+2. livre : lecteurs ayant aimé le livre 1
+  shards contactés : 1 (shard1RS) ; type de fusion : SINGLE_SHARD
+  requête envoyée à chaque shard : 0.1 Ko
+  travail sur les shards : find
+    shard1RS : 3360 clés, 0 documents examinés -> 3360 documents renvoyés à mongos
+  travail sur mongos : - -> 3360 résultats ; médiane 4 ms
+
+3. parcours, saut 2 : livres aimés par les 3360 lecteurs du livre 1
+  shards contactés : 2 (shard2RS, shard1RS) ; type de fusion : router
+  requête envoyée à chaque shard : 31.9 Ko
+  travail sur les shards : $match>$group
+    shard2RS : 107163 clés, 0 documents examinés -> 4682 documents renvoyés à mongos
+    shard1RS : 126825 clés, 0 documents examinés -> 4725 documents renvoyés à mongos
+  travail sur mongos : $mergeCursors -> 9407 résultats ; médiane 136 ms
+
+Résultats : results/dist_explain.csv
