@@ -14,29 +14,10 @@ import argparse
 import sys
 
 import pandas as pd
-from pymongo import MongoClient
-from pymongo.errors import BulkWriteError
+from bson import ObjectId
+from pymongo import MongoClient, UpdateOne
 
-from config import DATABASE_NAME, MONGO_TIMEOUT_MS, MONGO_URI, ORIGINAL, RATINGS_INITIAL, TO_READ_FILTERED
-
-
-def import_csv(db, collection_name, filename):
-
-    df = pd.read_csv(filename)
-    data = df.to_dict(orient="records")
-
-    if data:
-        try:
-            result = db[collection_name].insert_many(data, ordered=False)
-            nb_insérés = len(result.inserted_ids)
-        except BulkWriteError as e:
-            nb_insérés = e.details['nInserted']
-
-        rejetés = len(data) - nb_insérés  # doublons refusés par un index unique
-        print(f"{collection_name} : {nb_insérés} documents insérés sur {len(data)} lignes"
-              + (f" ({rejetés} doublons rejetés)" if rejetés else ""))
-    else:
-        print(f"{collection_name} : Le fichier CSV est vide.")
+from config import DATABASE_NAME, MONGO_TIMEOUT_MS, MONGO_URI, ORIGINAL, RATINGS_INITIAL, TO_READ_FILTERED, BOOK_TAGS_FILTERED
 
 
 def shard_activity(client, db, key):
@@ -46,6 +27,58 @@ def shard_activity(client, db, key):
         db.create_collection(name)
         client.admin.command("shardCollection", f"{db.name}.{name}", key={key: "hashed"})
         print(f"{name} : répartie sur les shards, clé {{{key}: 'hashed'}}")
+
+
+def create_indexes(db, pair):
+    """Index de toutes les collections ; `pair` est l'ordre de l'index unique (lecteur, livre)."""
+    print("\nCréation des index...")
+
+    db.ratings.create_index(pair, unique=True)
+    db.ratings.create_index("book_id")
+    # Index couvrants (alternative retenue après mesure, voir docs/LocalPrototype.md et bench.py) :
+    # "lecteurs ayant aimé un livre" et "livres aimés par des lecteurs" sans lire les documents
+    db.ratings.create_index([("book_id", 1), ("rating", 1), ("user_id", 1)], name="book_rating_user")
+    db.ratings.create_index([("user_id", 1), ("rating", 1), ("book_id", 1)], name="user_rating_book")
+
+    db.to_read.create_index(pair, unique=True)
+
+    db.books.create_index("book_id", unique=True)
+    db.books.create_index("goodreads_book_id")
+    db.books.create_index("title")
+
+    db.book_tags.create_index([("goodreads_book_id", 1), ("tag_id", 1)], unique=True)
+    db.book_tags.create_index("tag_id")
+
+    db.tags.create_index("tag_id", unique=True)
+
+    print("Index créés")
+
+
+def import_csv(db, collection_name, filename, identity_fields):
+
+    print(f"\nImport de {collection_name}...")
+    df = pd.read_csv(filename)
+
+    if df.empty:
+        print(f"{collection_name} : fichier CSV vide.")
+        return
+
+    data = df.to_dict(orient="records")
+
+    operations = []
+
+    for document in data:
+        identity = {field: document[field] for field in identity_fields}
+        # _id créé ici, dans l'ordre du fichier (ordre chronologique, utilisé par F3). Laissé au serveur, il
+        # serait créé par chaque shard et l'ordre des notes d'un lecteur réparti sur plusieurs shards serait perdu.
+        operations.append(UpdateOne(identity, {"$setOnInsert": {"_id": ObjectId(), **document}}, upsert=True))
+
+    # ordered=False : sur le cluster, mongos regroupe les opérations par shard. En mode ordonné, il doit
+    # respecter l'ordre du fichier et envoie presque un aller-retour par document (clé hachée : deux notes
+    # consécutives sont rarement sur le même shard), soit ~80 documents/s.
+    result = db[collection_name].bulk_write(operations, ordered=False)
+
+    print(f"{collection_name} : {result.upserted_count} documents insérés, {result.matched_count} déjà existants.")
 
 
 def main():
@@ -75,37 +108,17 @@ def main():
         if cluster:
             shard_activity(client, db, args.shard_key)
 
-        print("\nCréation des index...")
-
         # Sur un cluster, un index unique doit commencer par la clé de répartition : l'identité d'une note
         # (lecteur, livre) est donc indexée dans l'ordre (book_id, user_id) quand on répartit par livre.
         pair = [("book_id", 1), ("user_id", 1)] if cluster and args.shard_key == "book_id" \
             else [("user_id", 1), ("book_id", 1)]
-        db.ratings.create_index(pair, unique=True)
-        db.ratings.create_index("book_id")
-        # Index couvrants (alternative retenue après mesure, voir docs/LocalPrototype.md et bench.py) :
-        # "lecteurs ayant aimé un livre" et "livres aimés par des lecteurs" sans lire les documents
-        db.ratings.create_index([("book_id", 1), ("rating", 1), ("user_id", 1)], name="book_rating_user")
-        db.ratings.create_index([("user_id", 1), ("rating", 1), ("book_id", 1)], name="user_rating_book")
+        create_indexes(db, pair)
 
-        db.to_read.create_index(pair, unique=True)
-
-        db.books.create_index("book_id", unique=True)
-        db.books.create_index("goodreads_book_id")
-        db.books.create_index("title")
-
-        db.book_tags.create_index([("goodreads_book_id", 1), ("tag_id", 1)], unique=True)
-        db.book_tags.create_index("tag_id")
-
-        db.tags.create_index("tag_id", unique=True)
-
-        print("Index créés")
-
-        import_csv(db, "ratings", RATINGS_INITIAL)
-        import_csv(db, "to_read", TO_READ_FILTERED)
-        import_csv(db, "books", ORIGINAL / "books.csv")
-        import_csv(db, "book_tags", ORIGINAL / "book_tags.csv")
-        import_csv(db, "tags", ORIGINAL / "tags.csv")
+        import_csv(db, "ratings", RATINGS_INITIAL, ["user_id", "book_id"])
+        import_csv(db, "to_read", TO_READ_FILTERED, ["user_id", "book_id"])
+        import_csv(db, "books", ORIGINAL / "books.csv", ["book_id"])
+        import_csv(db, "book_tags", BOOK_TAGS_FILTERED, ["goodreads_book_id", "tag_id"])
+        import_csv(db, "tags", ORIGINAL / "tags.csv", ["tag_id"])
 
         print("\nImport terminé avec succès")
 

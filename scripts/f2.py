@@ -1,4 +1,7 @@
 # F2 : Trouver les similarités entre deux utilisateurs
+#
+# Usage (depuis scripts/) :
+#   python f2.py 20000 20028    (comparer les similarités entre l'utilisateur 20000 et 20028)
 
 import sys
 from math import sqrt
@@ -65,7 +68,7 @@ def find_common_books(db, user_id1, user_id2):
     ]
     return list(db.ratings.aggregate(pipeline))
 
-def group_user_tags(user_tags):
+def group_user_genres(user_tags):
     genres = {}
     for tag in user_tags:
         tag_name = tag["tag_name"].lower()
@@ -78,7 +81,7 @@ def group_user_tags(user_tags):
 
     return genres
 
-def calculate_tags_similarity(tags1, tags2):
+def calculate_genres_similarity(tags1, tags2):
 
     all_tags = set(tags1) | set(tags2)
 
@@ -105,8 +108,8 @@ def calculate_similarity(db, user1, user2):
             "common_books": len(common_books),
         }
 
-    user1_tags = group_user_tags(get_user_tags(db, user1))
-    user2_tags = group_user_tags(get_user_tags(db, user2))
+    user1_genres = group_user_genres(get_user_tags(db, user1))
+    user2_genres = group_user_genres(get_user_tags(db, user2))
 
     rating_score = 0
 
@@ -118,11 +121,11 @@ def calculate_similarity(db, user1, user2):
 
     rating_similarity  = rating_score / len(common_books)
 
-    # Comparer les tags
-    tag_similarity = calculate_tags_similarity(user1_tags, user2_tags)
+    # Comparer les genres
+    genre_similarity = calculate_genres_similarity(user1_genres, user2_genres)
 
     # Combiner les deux scores
-    similarity = rating_similarity * 0.6 + tag_similarity * 0.4
+    similarity = rating_similarity * 0.6 + genre_similarity * 0.4
 
     return {
         "user1": user1,
@@ -130,7 +133,7 @@ def calculate_similarity(db, user1, user2):
         "common_books": len(common_books),
         "similarity": round(similarity, 2),
         "rating_similarity": round(rating_similarity, 2),
-        "tag_similarity": round(tag_similarity, 2),
+        "genre_similarity": round(genre_similarity, 2),
     }
 
 def main():

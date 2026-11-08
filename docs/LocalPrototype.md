@@ -166,7 +166,7 @@ python bench.py          # mesures base vs covering -> results/
 
 - `prepare_data.py` n'utilise aucun hasard : le découpage suit l'ordre des lignes (l'ordre chronologique d'après la documentation), donc il est identique à chaque exécution.
 - `import_data.py` **supprime maintenant les collections** avant d'importer. Relancer l'import donne toujours le même état, au lieu de s'appuyer sur les index uniques pour ignorer les doublons.
-- L'import **affiche les lignes rejetées**. Le fichier `book_tags.csv` source contient 999 912 lignes, dont **8 doublons** `(goodreads_book_id, tag_id)`, refusés par l'index unique ; 999 904 documents sont gardés. C'est un des problèmes de données à documenter en annexe.
+- Le fichier `book_tags.csv` source contient 999 912 lignes, dont **8 doublons** `(goodreads_book_id, tag_id)`. `prepare_data.py` les supprime en gardant la dernière occurrence (`data/processed/book_tags_filtered.csv`), et 999 904 documents sont importés. Pour deux de ces couples, les comptes diffèrent (livre 3, tag 22743 : 6066 / 6065 ; livre 77449, tag 15169 : 8 / 7). C'est un des problèmes de données à documenter en annexe.
 
 Attention pour F6 : relancer `import_data.py` efface les notes ajoutées par F6 et remet la base à son état initial.
 

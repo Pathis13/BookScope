@@ -90,6 +90,28 @@ Comparer même les livres pas en commun ? Donc comparer par exemple les tags les
 
 ### Implémentation
 
+Les livres en commun ont leurs notes comparées pour définir un score de similarité des notes.
+
+| Écart de note | Similarité |
+| :-----------: | :--------: |
+| 0             | 100%       |
+| 1             | 75%        |
+| 2             | 50%        |
+| 3             | 25%        |
+| 4             | 0%         |  
+
+Pour les livres pas en commun, une première idée a été de comparer les tags de tous les livres notés par les deux utilisateurs, mais après avoir essayé, on a vu qu'il y en avait très peu en commun et que ceux qui l'étaient n'étaient pas intéressants comme : "to-read", "currently-reading", "favorites", "books-i-own" qui ne sont pas utiles pour comparer la similarité.
+
+Les tags intéressants comme fantasy ne sont souvent pas exactement les mêmes pour tous les livres car il y a des centaines de tags qui contiennent ce mot-clé.
+
+Au lieu d'utiliser les tags directement, on utilise une liste de genres qui est définie dans [config.py](/scripts/config.py) ce qui permet de regrouper les tags intéressants plus facilement.
+
+On regarde aussi la note attribuée aux livres pour savoir si un utilisateur aime ou non un genre, même s'il en a noté beaucoup, il pourrait ne pas aimer.
+
+À la fin, on calcule un score de similarité par genre que l'on additionne avec celui des notes pour avoir un pourcentage de similarité global.
+
+
+
 ## F3
 Entrée : id user
 Sortie : Liste de livres (ordonnée du plus au moins recommandable)
@@ -241,3 +263,11 @@ Regarder si note est la même qu'une déjà mise par l'user sur ce livre
 Sinon remplacer ?
 
 Compter les trucs
+
+### Implémentation
+
+La vérification des fichiers CSV est faite plus tôt dans [prepare_data.py](/scripts/prepare_data.py).
+
+Pour chaque note d'utilisateur présente dans le fichier d'update, on met à jour le document de la collection qui correspond au même utilisateur et au même livre. S'il n'y en a pas, on l'ajoute.
+
+On affiche à la fin le nombre de nouvelles notes, le nombre de notes déjà présentes, et le nombre de notes modifiées.

@@ -25,6 +25,7 @@ RATINGS_INITIAL = PROCESSED / "ratings_initial.csv"
 RATINGS_UPDATE_F6 = PROCESSED / "ratings_update_F6.csv"
 RATINGS_EVALUATION_E3 = PROCESSED / "ratings_evaluation_E3.csv"
 TO_READ_FILTERED = PROCESSED / "to_read_filtered.csv"
+BOOK_TAGS_FILTERED = PROCESSED / "book_tags_filtered.csv"
 
 # --- Sélection des données ---
 # Utilisateurs gardés : user_id entre MIN_USER_ID et MAX_USER_ID (inclus)
@@ -55,6 +56,7 @@ F1_LIMIT = 10
 # --- F2 : similarité utilisateurs ---
 # Nombre minimum de livres en commun pour pour pouvoir évaluer les similarité entre deux utilisateurs
 MIN_SHARED_BOOKS = 5
+# Liste des mots à chercher par genre
 GENRES = {
     "fantasy": ["fantasy"],
     "science-fiction": ["science-fiction", "sci-fi"],
