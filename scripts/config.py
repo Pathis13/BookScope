@@ -17,6 +17,7 @@ RATINGS_INITIAL = PROCESSED / "ratings_initial.csv"
 RATINGS_UPDATE_F6 = PROCESSED / "ratings_update_F6.csv"
 RATINGS_EVALUATION_E3 = PROCESSED / "ratings_evaluation_E3.csv"
 TO_READ_FILTERED = PROCESSED / "to_read_filtered.csv"
+BOOK_TAGS_FILTERED = PROCESSED / "book_tags_filtered.csv"
 
 # --- Sélection des données ---
 # Utilisateurs gardés : user_id entre MIN_USER_ID et MAX_USER_ID (inclus)

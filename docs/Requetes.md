@@ -262,3 +262,11 @@ Regarder si note est la même qu'une déjà mise par l'user sur ce livre
 Sinon remplacer ?
 
 Compter les trucs
+
+### Implémentation
+
+La vérification des fichiers CSV est faite plus tôt dans [prepare_data.py](/scripts/prepare_data.py).
+
+Pour chaque note d'utilisateur présente dans le fichier d'update, on met à jour le document de la collection qui correspond au même utilisateur et au même livre. S'il n'y en a pas, on l'ajoute.
+
+On affiche à la fin le nombre de nouvelles notes, le nombre de notes déjà présentes, et le nombre de notes modifiées.
