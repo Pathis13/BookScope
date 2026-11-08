@@ -16,6 +16,7 @@
 #   python compare.py --only cluster        (local vs un seul déploiement)
 # Sortie : results/compare_report.csv ; code de retour 1 si une différence est trouvée.
 
+import statistics
 import argparse
 import csv
 import sys
@@ -141,14 +142,31 @@ def first_diff(a, b, path="résultat"):
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
-    parser = argparse.ArgumentParser(description="Comparaison automatique des déploiements")
+    parser = argparse.ArgumentParser(description="Comparaison répétée des déploiements")
     parser.add_argument("--only", choices=["cluster", "cluster_book"], help="ne comparer qu'un déploiement à local")
+    parser.add_argument("--reps", type=int, default=5, help="nombre de répétitions mesurées après échauffement (défaut : 5)")
     args = parser.parse_args()
+    if args.reps < 1:
+        parser.error("--reps doit être supérieur ou égal à 1")
     names = ["local"] + ([args.only] if args.only else ["cluster", "cluster_book"])
 
     clients = {n: MongoClient(DEPLOYMENTS[n][0], serverSelectionTimeoutMS=MONGO_TIMEOUT_MS) for n in names}
     dbs = {n: clients[n][DEPLOYMENTS[n][1]] for n in names}
-    rows, nb_diff = [], 0
+    raw_rows, nb_diff = [], 0
+
+    def record(service, inputs, deployment, run_type, rep, elapsed, output, reference):
+        nonlocal nb_diff
+        same = output == reference
+        if not same:
+            nb_diff += 1
+        raw_rows.append({
+            "service": service, "input": repr(inputs), "deployment": deployment,
+            "run_type": run_type, "rep": rep, "seconds": round(elapsed, 6),
+            "identical": same,
+            "diff": "" if same else first_diff(reference, output),
+        })
+        return same
+
     try:
         for n in names:
             print(f"{n:<13}: {DEPLOYMENTS[n][0]} base {DEPLOYMENTS[n][1]}, "
@@ -157,34 +175,78 @@ def main():
         for line in locations(dbs):
             print(f"  {line}")
 
-        print(f"\n{'service':<8}{'entrée':<16}" + "".join(f"{n:>22}" for n in names))
+        print(f"\nMesures : 1 premier appel + 1 échauffement + {args.reps} répétitions mesurées")
+        print("Le premier appel n'est pas une garantie de cache MongoDB/OS froid.")
         for service, inputs in CASES:
-            outs, line = {}, f"{service:<8}{str(inputs):<16}"
+            # Référence locale calculée une fois, puis chronométrage de chaque déploiement.
+            reference = RUN[service](dbs["local"], *inputs)
             for n in names:
-                t = time.perf_counter()
-                outs[n] = RUN[service](dbs[n], *inputs)
-                dt = time.perf_counter() - t
-                same = n == "local" or outs[n] == outs["local"]
-                nb_diff += not same
-                line += f"{('référence' if n == 'local' else 'identique' if same else 'DIFFÉRENT'):>13} {dt:6.2f} s"
-                rows.append({"service": service, "input": inputs, "deployment": n, "seconds": round(dt, 3),
-                             "identical": same,
-                             "diff": "" if same else first_diff(outs["local"], outs[n])})
-            print(line)
-            for row in rows[-len(names):]:
-                if row["diff"]:
-                    print(f"    {row['deployment']} : {row['diff']}")
+                # Premier appel mesuré (distinct d'un véritable vidage de cache).
+                t0 = time.perf_counter()
+                output = RUN[service](dbs[n], *inputs)
+                dt = time.perf_counter() - t0
+                first_dt = dt
+                same = record(service, inputs, n, "first_call", 1, dt, output, reference)
+                if not same:
+                    print(f"DIFF {service} {inputs} {n} premier appel : {first_diff(reference, output)}")
+
+                # Échauffement non mesuré.
+                warm_output = RUN[service](dbs[n], *inputs)
+                if not record(service, inputs, n, "warmup", 0, 0.0, warm_output, reference):
+                    print(f"DIFF {service} {inputs} {n} échauffement : {first_diff(reference, warm_output)}")
+
+                hot_times = []
+                for rep in range(1, args.reps + 1):
+                    t0 = time.perf_counter()
+                    output = RUN[service](dbs[n], *inputs)
+                    dt = time.perf_counter() - t0
+                    hot_times.append(dt)
+                    same = record(service, inputs, n, "hot", rep, dt, output, reference)
+                    if not same:
+                        print(f"DIFF {service} {inputs} {n} répétition {rep} : {first_diff(reference, output)}")
+                med = statistics.median(hot_times)
+                print(f"{service:<3} {str(inputs):<18} {n:<13} premier={first_dt:.3f}s "
+                      f"médiane_hot={med:.3f}s")
     finally:
         for c in clients.values():
             c.close()
 
-    (ROOT / "results").mkdir(exist_ok=True)
-    with open(ROOT / "results" / "compare_report.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["service", "input", "deployment", "seconds", "identical", "diff"])
+    out_dir = ROOT / "results"
+    out_dir.mkdir(exist_ok=True)
+    raw_path = out_dir / "compare_timing_raw.csv"
+    with open(raw_path, "w", newline="", encoding="utf-8") as f:
+        fields = ["service", "input", "deployment", "run_type", "rep", "seconds", "identical", "diff"]
+        w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
-        w.writerows(rows)
-    total = len(CASES) * (len(names) - 1)
-    print(f"\n{total - nb_diff}/{total} comparaisons identiques. Rapport : results/compare_report.csv")
+        w.writerows(raw_rows)
+
+    # Statistiques sur les répétitions hot uniquement (mêmes entrées regroupées).
+    groups = {}
+    for row in raw_rows:
+        if row["run_type"] == "hot":
+            key = (row["service"], row["input"], row["deployment"])
+            groups.setdefault(key, []).append(float(row["seconds"]))
+    summary_rows = []
+    for (service, inputs, deployment), values in groups.items():
+        summary_rows.append({
+            "service": service, "input": inputs, "deployment": deployment,
+            "reps": len(values), "mean_s": round(statistics.mean(values), 6),
+            "median_s": round(statistics.median(values), 6),
+            "stdev_s": round(statistics.stdev(values), 6) if len(values) > 1 else 0.0,
+            "min_s": round(min(values), 6), "max_s": round(max(values), 6),
+        })
+    summary_path = out_dir / "compare_timing_summary.csv"
+    with open(summary_path, "w", newline="", encoding="utf-8") as f:
+        fields = ["service", "input", "deployment", "reps", "mean_s", "median_s", "stdev_s", "min_s", "max_s"]
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(summary_rows)
+
+    total_checks = len(raw_rows)
+    ok_checks = sum(1 for row in raw_rows if row["identical"])
+    print(f"\n{ok_checks}/{total_checks} résultats identiques à la référence locale.")
+    print(f"Mesures brutes : {raw_path}")
+    print(f"Synthèse des répétitions hot : {summary_path}")
     sys.exit(1 if nb_diff else 0)
 
 
