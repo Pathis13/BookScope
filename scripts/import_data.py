@@ -65,20 +65,13 @@ def import_csv(db, collection_name, filename, identity_fields):
 
     data = df.to_dict(orient="records")
 
-    operations = []
-
+    # Générer les ObjectId côté client, dans l'ordre du CSV
     for document in data:
-        identity = {field: document[field] for field in identity_fields}
-        # _id créé ici, dans l'ordre du fichier (ordre chronologique, utilisé par F3). Laissé au serveur, il
-        # serait créé par chaque shard et l'ordre des notes d'un lecteur réparti sur plusieurs shards serait perdu.
-        operations.append(UpdateOne(identity, {"$setOnInsert": {"_id": ObjectId(), **document}}, upsert=True))
+        document["_id"] = ObjectId()
 
-    # ordered=False : sur le cluster, mongos regroupe les opérations par shard. En mode ordonné, il doit
-    # respecter l'ordre du fichier et envoie presque un aller-retour par document (clé hachée : deux notes
-    # consécutives sont rarement sur le même shard), soit ~80 documents/s.
-    result = db[collection_name].bulk_write(operations, ordered=False)
+    result = db[collection_name].insert_many(data, ordered=False)
 
-    print(f"{collection_name} : {result.upserted_count} documents insérés, {result.matched_count} déjà existants.")
+    print(f"{collection_name} : {len(result.inserted_ids)} documents insérés.")
 
 
 def main():
@@ -88,6 +81,7 @@ def main():
     parser.add_argument("--db", default=DATABASE_NAME, help="nom de la base")
     parser.add_argument("--shard-key", choices=["user_id", "book_id"], default="user_id",
                         help="clé de répartition de l'activité (cluster uniquement)")
+    parser.add_argument("--ratings-file", default=str(RATINGS_INITIAL), help="Fichier CSV des notes à importer")
     args = parser.parse_args()
 
     client = MongoClient(args.uri, serverSelectionTimeoutMS=MONGO_TIMEOUT_MS)
@@ -114,7 +108,7 @@ def main():
             else [("user_id", 1), ("book_id", 1)]
         create_indexes(db, pair)
 
-        import_csv(db, "ratings", RATINGS_INITIAL, ["user_id", "book_id"])
+        import_csv(db, "ratings", args.ratings_file, ["user_id", "book_id"])
         import_csv(db, "to_read", TO_READ_FILTERED, ["user_id", "book_id"])
         import_csv(db, "books", ORIGINAL / "books.csv", ["book_id"])
         import_csv(db, "book_tags", BOOK_TAGS_FILTERED, ["goodreads_book_id", "tag_id"])
