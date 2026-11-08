@@ -47,6 +47,7 @@ F1_LIMIT = 10
 # --- F2 : similarité utilisateurs ---
 # Nombre minimum de livres en commun pour pour pouvoir évaluer les similarité entre deux utilisateurs
 MIN_SHARED_BOOKS = 5
+# Liste des mots à chercher par genre
 GENRES = {
     "fantasy": ["fantasy"],
     "science-fiction": ["science-fiction", "sci-fi"],
