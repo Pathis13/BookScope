@@ -20,7 +20,7 @@ Vérifier dans MongoDB Compass que la base de données bookscope est dans la con
 - `prepare_data.py` vérifie les notes (valeurs manquantes, notes hors de 1 à 5, doublons), découpe l'historique de chaque lecteur et supprime les 8 doublons de `book_tags.csv` (`data/processed/book_tags_filtered.csv`).
 - `import_data.py` **supprime les collections** avant d'importer, crée les index (dont les deux index couvrants retenus en Part I), puis importe. Relancer l'import remet donc la base à son état initial et efface les notes ajoutées par F6.
 
-Les paramètres partagés (connexion MongoDB, chemins, sélection des utilisateurs, seuils…) sont dans [scripts/config.py](scripts/config.py).
+Les paramètres partagés (connexion MongoDB, chemins, sélection des utilisateurs, seuils...) sont dans [scripts/config.py](scripts/config.py).
 
 
 ## F1 : livres similaires
@@ -55,7 +55,7 @@ python f3.py 20000 --limit 20      # nombre de recommandations (10 par défaut)
 python f3.py 20000 --truncate 5    # historique réduit aux 5 premières notes du lecteur
 ```
 
-Les 10 livres les mieux notés du lecteur (note ≥ 4) sont envoyés à F1 ; chaque livre similaire non noté gagne +1 à chaque apparition.
+Les 10 livres les mieux notés du lecteur (note >= 4) sont envoyés à F1 ; chaque livre similaire non noté gagne +1 à chaque apparition.
 Chaque recommandation indique les livres du lecteur qui l'ont fait apparaître, et la sortie se termine par l'écart à la popularité (part dans le top 100 des livres les plus notés, popularité médiane).
 
 
@@ -68,7 +68,7 @@ python f4.py 1 2 --limit 10        # nombre de chemins
 python f4.py 1 2 --max-steps 2     # chemins à 2 étapes au plus (3 par défaut)
 ```
 
-Chemins A → X → B (ou A → X → Y → B) dont chaque étape est un lectorat partagé : assez de lecteurs ont aimé les deux livres, nettement plus que le hasard. Les livres « carrefours » sont interdits comme intermédiaires, et chaque étape est prouvée par des lecteurs.
+Chemins A -> X -> B (ou A -> X -> Y -> B) dont chaque étape est un lectorat partagé : assez de lecteurs ont aimé les deux livres, nettement plus que le hasard. Les livres "carrefours" sont interdits comme intermédiaires, et chaque étape est prouvée par des lecteurs.
 
 
 ## F5 : lien entre deux centres d'intérêt
@@ -79,7 +79,7 @@ python f5.py fantasy romance       # par nom exact du tag
 python f5.py fantasy romance --limit 5
 ```
 
-Compare les groupes de lecteurs des deux tags au hasard (lift), donne les livres « pont » aimés des deux côtés, puis recalcule le tout sans les livres très populaires ni les lecteurs très actifs pour voir si le lien tient.
+Compare les groupes de lecteurs des deux tags au hasard (lift), donne les livres "pont" aimés des deux côtés, puis recalcule le tout sans les livres très populaires ni les lecteurs très actifs pour voir si le lien tient.
 
 
 ## F6 : mise à jour par lot
@@ -122,6 +122,42 @@ Pour lancer un service sur le cluster : `BOOKSCOPE_URI=mongodb://localhost:27400
 Si une instance utile est arrêtée, F2, F3 et F6 échouent explicitement (code de retour 2) au lieu de donner ou d'écrire un résultat partiel.
 
 `compare.py` suppose que les trois bases ont été chargées à partir des mêmes fichiers : après une modification de `prepare_data.py` ou de `import_data.py`, ou après F6 sur une seule base, réimporter les trois.
+
+
+## Expériences
+
+### E1 : taille des données et performances
+
+```bash
+python prepare_e1.py               # sous-ensembles de 250 000, 500 000 et 903 033 notes (graine fixe)
+create_e1_db.bat                   # importe les trois bases bookscope_e1_250k, _500k et _full
+python benchmark_e1.py --db bookscope_e1_250k --repeats 5
+python benchmark_e1.py --db bookscope_e1_500k --repeats 5
+python benchmark_e1.py --db bookscope_e1_full --repeats 5
+```
+
+Chaque sous-ensemble est inclus dans le suivant. `benchmark_e1.py` relève la taille de la base et le temps de F1 à F5 (une exécution de chauffe, puis `--repeats` mesures) et ajoute les résultats à `results/e1_measurements.csv`.
+
+### E2 : local contre distribué
+
+Les trois bases (local, cluster par lecteur, cluster par livre) doivent être chargées comme dans la section "Déploiement distribué" plus haut.
+
+```bash
+python compare.py                  # 5 répétitions par défaut
+python compare.py --reps 10
+```
+
+Le script vérifie aussi que les résultats sont identiques. Temps bruts dans `results/compare_timing_raw.csv`, résumé (médiane, écart-type) dans `results/compare_timing_summary.csv`.
+
+### E3 : pertinence des recommandations
+
+```bash
+python e3.py                       # 20 lecteurs tirés au hasard (graine 1)
+python e3.py --users 50 --seed 2
+python e3.py --users all
+```
+
+Pour chaque lecteur, F3 et une recommandation par popularité sont comparées sur les livres notés 4 ou 5 dans le jeu d'évaluation (`data/processed/ratings_evaluation_E3.csv`), avec l'historique complet puis tronqué aux 5 premières notes. Recall@10 et Precision@10 sont écrits dans `results/results_e3.csv`.
 
 
 ## Documentation

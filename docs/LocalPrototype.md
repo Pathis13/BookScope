@@ -21,7 +21,7 @@ MongoDB tourne comme processus `mongod` séparé. Les scripts Python l'interroge
 | Python | 3.13.14 |
 | pymongo / pandas | 4.19.0 / 3.0.6 (figés dans `requirements.txt`) |
 
-Toute la base tient dans le cache de MongoDB : 15,8 Mo de données compressées pour `ratings`. Les mesures se font donc base « chaude », voir les limites plus bas.
+Toute la base tient dans le cache de MongoDB : 15,8 Mo de données compressées pour `ratings`. Les mesures se font donc base "chaude", voir les limites plus bas.
 
 ## 2. Modèle de données
 
@@ -37,7 +37,7 @@ Il y a une collection par fichier source. Les notes restent **à plat**, un docu
 | `tags` | noms des tags | 34 252 | `tag_id`, `tag_name` |
 | `to_read` | listes de lecture des mêmes lecteurs | 182 725 | `user_id`, `book_id` |
 
-Les autres colonnes de `books.csv` (ISBN, URLs d'images, détail des notes de 1 à 5…) sont importées mais pas utilisées.
+Les autres colonnes de `books.csv` (ISBN, URLs d'images, détail des notes de 1 à 5...) sont importées mais pas utilisées.
 
 ### Relations
 
@@ -52,7 +52,7 @@ Les autres colonnes de `books.csv` (ISBN, URLs d'images, détail des notes de 1 
 | Lecteurs ayant aimé un livre (`book_id`, `rating >= 4`) | F1, F4, F5 | `book_rating_user` (couvrant) |
 | Livres aimés par un ensemble de lecteurs (`user_id $in`, `rating >= 4`, `$group` par livre) | F1, F4, F5 | `user_rating_book` (couvrant) |
 | Notes d'un lecteur, livres communs à deux lecteurs | F2, F3 | `user_rating_book` (couvrant) |
-| Notes d'un lecteur → livres → tags (`$lookup`) | F2 | `$lookup` sur `books.work_id` : **pas d'index**, jointure par hachage (`HashJoin`) après lecture complète de `books` ; voir l'anomalie de F2 plus bas |
+| Notes d'un lecteur -> livres -> tags (`$lookup`) | F2 | `$lookup` sur `books.work_id` : **pas d'index**, jointure par hachage (`HashJoin`) après lecture complète de `books` ; voir l'anomalie de F2 plus bas |
 | Unicité d'une note (lecteur, livre) | import, F6 | `user_id_1_book_id_1` (unique) |
 | Livres d'un tag | F1, F5 | `book_tags.tag_id` |
 | Tags d'un livre | F1 | `book_tags.(goodreads_book_id, tag_id)` (unique) |
@@ -77,7 +77,7 @@ Il a fallu une petite modification du code pour en profiter : les projections de
 
 - Les deux configurations portent sur les mêmes données. `base` correspond aux index d'origine, `covering` à `base` plus les deux index couvrants.
 - Entrées fixes : livre 1 (le plus aimé, donc le cas le plus lourd), lecteur 20000, F2 entre les lecteurs 20000 et 22534 (28 livres en commun, le maximum pour 20000), F4 entre les livres 1 et 5000, F5 entre fantasy (11305) et romance (26138).
-- Pour chaque requête, le premier appel après le changement d'index est noté « froid », puis viennent 5 appels « chauds » (médiane et écart-type).
+- Pour chaque requête, le premier appel après le changement d'index est noté "froid", puis viennent 5 appels "chauds" (médiane et écart-type).
 - `explain("executionStats")` donne le plan, les clés et les documents examinés pour les requêtes élémentaires.
 - Coût en écriture : insertion du lot F6 (112 863 notes) dans une collection temporaire portant les mêmes index, 3 fois.
 - Les résultats des requêtes et services sont comparés entre les deux configurations : **ils sont identiques** pour les 8 requêtes.
@@ -87,11 +87,11 @@ Il a fallu une petite modification du code pour en profiter : les projections de
 
 **Requêtes élémentaires**
 
-| Requête | base | covering | Plan base → covering | Documents lus base → covering |
+| Requête | base | covering | Plan base -> covering | Documents lus base -> covering |
 |---|---|---|---|---|
-| Lecteurs ayant aimé le livre 1 | 5 ms | 3 ms | `FETCH > IXSCAN` → `PROJECTION_COVERED > IXSCAN` | 3 998 → **0** |
-| Notes du lecteur 20000 | < 1 ms | < 1 ms | `FETCH > IXSCAN` → `PROJECTION_COVERED > IXSCAN` | 91 → **0** |
-| Livres aimés par les lecteurs du livre 1 | 236 ms | **70 ms** (−70 %) | `GROUP > FETCH > IXSCAN` → `GROUP > PROJECTION_COVERED > IXSCAN` | 308 065 → **0** |
+| Lecteurs ayant aimé le livre 1 | 5 ms | 3 ms | `FETCH > IXSCAN` -> `PROJECTION_COVERED > IXSCAN` | 3 998 -> **0** |
+| Notes du lecteur 20000 | < 1 ms | < 1 ms | `FETCH > IXSCAN` -> `PROJECTION_COVERED > IXSCAN` | 91 -> **0** |
+| Livres aimés par les lecteurs du livre 1 | 236 ms | **70 ms** (-70 %) | `GROUP > FETCH > IXSCAN` -> `GROUP > PROJECTION_COVERED > IXSCAN` | 308 065 -> **0** |
 
 Le nombre de clés examinées baisse aussi (de 3 998 à 3 360, et de 313 614 à 230 690). Comme `rating` fait partie de l'index, la condition `rating >= 4` limite directement la plage lue au lieu de filtrer après coup.
 
@@ -99,23 +99,23 @@ Le nombre de clés examinées baisse aussi (de 3 998 à 3 360, et de 313 614 à 
 
 | Service | base | covering | Gain | Écart-type base / covering |
 |---|---|---|---|---|
-| F1 (livre 1) | 2,71 s | 1,50 s | −45 % | 0,02 / 0,02 s |
-| F2 (20000 / 22534) | 0,094 s | 0,093 s | −2 % | 0,001 / 0,001 s |
-| F3 (lecteur 20000) | 14,52 s | 8,83 s | −39 % | 0,11 / 0,15 s |
-| F4 (1 → 5000) | 1,07 s | 0,42 s | −61 % | 0,008 / 0,004 s |
-| F5 (fantasy / romance) | 4,28 s | 1,59 s | −63 % | 0,04 / 0,009 s |
+| F1 (livre 1) | 2,71 s | 1,50 s | -45 % | 0,02 / 0,02 s |
+| F2 (20000 / 22534) | 0,094 s | 0,093 s | -2 % | 0,001 / 0,001 s |
+| F3 (lecteur 20000) | 14,52 s | 8,83 s | -39 % | 0,11 / 0,15 s |
+| F4 (1 -> 5000) | 1,07 s | 0,42 s | -61 % | 0,008 / 0,004 s |
+| F5 (fantasy / romance) | 4,28 s | 1,59 s | -63 % | 0,04 / 0,009 s |
 
-F2 ne gagne presque rien : sa lecture de `ratings` (livres communs, 7 ms) était déjà rapide. Son temps est presque entièrement dans `get_user_tags`, la jointure notes → livres → tags, qui passe par les index de `books` et `book_tags`, pas par ceux de `ratings`. Ces mesures sont faites avec la jointure corrigée (voir l'anomalie de F2 plus bas) : F2 prend 0,09 s, contre 0,46 s avant la correction.
+F2 ne gagne presque rien : sa lecture de `ratings` (livres communs, 7 ms) était déjà rapide. Son temps est presque entièrement dans `get_user_tags`, la jointure notes -> livres -> tags, qui passe par les index de `books` et `book_tags`, pas par ceux de `ratings`. Ces mesures sont faites avec la jointure corrigée (voir l'anomalie de F2 plus bas) : F2 prend 0,09 s, contre 0,46 s avant la correction.
 
 **Coûts**
 
 | Coût | base | covering |
 |---|---|---|
 | Taille totale des index de `ratings` | 34,1 Mo | 54,0 Mo (+58 %, +19,9 Mo) |
-| Création des deux index | — | 2,0 s |
+| Création des deux index | - | 2,0 s |
 | Insertion du lot F6 (112 863 notes) | 0,88 s | 1,19 s (+35 %) |
 
-La taille des index est plus grande qu'au premier passage de `bench.py` (23,3 → 43,2 Mo à l'époque, 34,1 → 54,0 Mo maintenant), alors que les données sont les mêmes. Entre les deux, l'import est passé de `insert_many` à des upserts (merge de F6). C'est la cause probable : les index sont remplis dans un ordre moins favorable et restent moins compacts. Cela n'a pas été vérifié. Le surcoût des deux index couvrants ne change pas (+19,9 Mo).
+La taille des index est plus grande qu'au premier passage de `bench.py` (23,3 -> 43,2 Mo à l'époque, 34,1 -> 54,0 Mo maintenant), alors que les données sont les mêmes. Entre les deux, l'import est passé de `insert_many` à des upserts (merge de F6). C'est la cause probable : les index sont remplis dans un ordre moins favorable et restent moins compacts. Cela n'a pas été vérifié. Le surcoût des deux index couvrants ne change pas (+19,9 Mo).
 
 ### Compromis et décision : **retenue**
 
@@ -131,7 +131,7 @@ Conséquence : `book_id_1` devient redondant, puisque c'est le début de `book_r
 
 ### Limites des mesures
 
-- **Base toujours en mémoire.** Les données tiennent dans le cache de 15 Go. Le premier appel après un changement d'index (« froid ») n'est donc presque pas plus lent qu'un appel « chaud ». Une vraie mesure à froid demanderait de redémarrer `mongod` avant chaque série.
+- **Base toujours en mémoire.** Les données tiennent dans le cache de 15 Go. Le premier appel après un changement d'index ("froid") n'est donc presque pas plus lent qu'un appel "chaud". Une vraie mesure à froid demanderait de redémarrer `mongod` avant chaque série.
 - **Client et serveur sur la même machine.** Ils partagent processeur, mémoire et disque.
 - **Une seule entrée par service.** Le livre 1 est le cas le plus lourd pour F1 et F4 ; un livre peu aimé donnerait des gains absolus plus faibles.
 - **Le reste du temps n'est pas dans les index.** Ce qui reste dans F3 (8,8 s) vient surtout des 10 appels à F1 et des agrégations globales, qui lisent toute la collection quels que soient les index.
@@ -152,7 +152,7 @@ La correction rend F2 environ 5 fois plus rapide, parce que `books.book_id` est 
 ### Alternatives écartées sans implémentation
 
 - **Notes imbriquées par lecteur** (`users { user_id, ratings: [...] }`). Les requêtes centrées lecteur (F2, F3) liraient un seul document. Mais celles centrées livre (F1, F4, F5) devraient parcourir tous les tableaux (`$unwind`) ou dépendre d'un index multiclé, et une mise à jour F6 réécrirait tout le document du lecteur. Comme la plupart des services sont centrés livre, ce modèle n'a pas été retenu. Il redevient intéressant en Part II pour placer toutes les notes d'un lecteur sur la même instance.
-- **Liens livre → livre précalculés.** Le gain serait probablement plus grand pour F1 et F4, mais F6 devrait maintenir cette collection à chaque import (exigence du sujet). Écarté tant que F6 n'est pas stabilisé.
+- **Liens livre -> livre précalculés.** Le gain serait probablement plus grand pour F1 et F4, mais F6 devrait maintenir cette collection à chaque import (exigence du sujet). Écarté tant que F6 n'est pas stabilisé.
 
 ## 4. Reproductibilité
 
@@ -172,11 +172,8 @@ python bench.py          # mesures base vs covering -> results/
 
 Attention pour F6 : relancer `import_data.py` efface les notes ajoutées par F6 et remet la base à son état initial.
 
-## Ce qu'il reste à faire
+## Pistes d'amélioration
 
-- [ ] Rédiger la section du rapport à partir de ce document : modèle, tableau des requêtes et index, mesures, décision.
-- [ ] Prévenir la personne qui fait F6 : l'insertion est environ 40 % plus lente avec les index couvrants, et l'import remet la base à zéro.
-- [x] Corriger la jointure `work_id` → `book_id` de F2.
-- [x] Relancer `bench.py` pour mettre à jour les mesures de F2.
-- [ ] (Optionnel) Mesurer la suppression de `book_id_1`.
-- [ ] (Optionnel) Refaire une série à froid en redémarrant `mongod`, et mesurer F1 et F4 sur un livre peu aimé.
+- Supprimer l'index `book_id_1`, devenu redondant avec `book_rating_user`, et mesurer le gain en place et en écriture.
+- Refaire une série de mesures à froid en redémarrant `mongod` avant chaque série.
+- Mesurer F1 et F4 sur un livre peu aimé, pour avoir un cas moins extrême que le livre 1.

@@ -1,6 +1,6 @@
 # Pièges rencontrés et corrections
 
-Ce document recense les erreurs rencontrées pendant le développement de BookScope (Part I, Part II, merge de F6). Pour chacune : ce qu'on observe, la cause, la correction appliquée, et la façon de repérer le problème la prochaine fois.
+Ce document recense les erreurs rencontrées pendant le développement de BookScope (Part I, Part II, F6). Pour chacune : ce qu'on observe, la cause, la correction appliquée, et la façon de repérer le problème la prochaine fois.
 
 La plupart de ces erreurs **ne provoquent aucun message d'erreur**. Le script s'exécute normalement mais le résultat est faux, incomplet ou lent. Elles n'ont été trouvées que par une mesure (`explain`, `bench.py`) ou par une comparaison (`compare.py`).
 
@@ -16,9 +16,8 @@ La plupart de ces erreurs **ne provoquent aucun message d'erreur**. Le script s'
 | 8 | Shard arrêté et `allowPartialResults` | Résultat partiel sans aucune erreur | Évité (availability.py) |
 | 9 | Relancer `import_data.py` | Efface les notes ajoutées par F6 | Mise en garde |
 | 10 | Données préparées modifiées sans tout réimporter | Comparaison local / cluster faussée | Mise en garde |
-| 11 | Deux réécritures parallèles du même fichier | Conflit de merge | Résolu |
-| 12 | Encodage de la console Windows | Accents illisibles dans la sortie | Corrigé (f6), reste prepare_data |
-| 13 | Shard relancé juste après son arrêt | Le shard ne redémarre pas | Corrigé (cluster.py) |
+| 11 | Encodage de la console Windows | Accents illisibles dans la sortie | Corrigé (f6) |
+| 12 | Shard relancé juste après son arrêt | Le shard ne redémarre pas | Corrigé (cluster.py) |
 
 ---
 
@@ -49,7 +48,7 @@ db.ratings.find({"book_id": b, "rating": {"$gte": 4}}, {"_id": 0, "user_id": 1})
 "foreignField": "work_id",    # devrait être "book_id"
 ```
 
-**Correction appliquée.** `"foreignField": "book_id"`, avec un commentaire dans `f2.py`. Pour la paire 20000 / 22534, la similarité des genres passe de 67,21 à 98,42, et la similarité globale de 74,56 à 87,05. F2 est aussi environ 5 fois plus rapide (0,46 s → 0,09 s), parce que `books.book_id` est indexé. `bench.py` a été relancé avec la version corrigée.
+**Correction appliquée.** `"foreignField": "book_id"`, avec un commentaire dans `f2.py`. Pour la paire 20000 / 22534, la similarité des genres passe de 67,21 à 98,42, et la similarité globale de 74,56 à 87,05. F2 est aussi environ 5 fois plus rapide (0,46 s -> 0,09 s), parce que `books.book_id` est indexé. `bench.py` a été relancé avec la version corrigée.
 
 **Comment le repérer.** Compter les documents juste après le `$unwind` qui suit le `$lookup`, et comparer au nombre de notes du lecteur. Un `$unwind` élimine en silence les documents sans correspondance.
 
@@ -71,7 +70,7 @@ db.ratings.find({"book_id": b, "rating": {"$gte": 4}}, {"_id": 0, "user_id": 1})
 
 ## 4. Ordre chronologique perdu : `_id` créé par les shards
 
-**Symptôme.** Après le merge de F6, `compare.py` donnait 23 résultats identiques sur 26. Les 3 différences concernaient F3, et uniquement sur la base répartie par livre (`bookscope_book`). Elles portaient sur les livres graines (`seeds`), choisis à partir de l'historique du lecteur.
+**Symptôme.** Après l'ajout de F6, `compare.py` donnait 23 résultats identiques sur 26. Les 3 différences concernaient F3, et uniquement sur la base répartie par livre (`bookscope_book`). Elles portaient sur les livres graines (`seeds`), choisis à partir de l'historique du lecteur.
 
 **Cause.** F3 retrouve l'ordre chronologique des notes d'un lecteur en triant sur `_id` (`user_history` dans `f3.py`). Cela suppose que les `_id` suivent l'ordre du fichier.
 - Avec `insert_many`, c'est le cas : pymongo crée les `_id` côté client, dans l'ordre.
@@ -135,7 +134,7 @@ Ensuite, relancer l'import.
 | 77449 | 15169 | 8 et 7 |
 
 **Ce qui a changé.**
-- Avant le merge, l'index unique rejetait le second doublon à l'import, donc on gardait le **premier**.
+- Avant F6, l'index unique rejetait le second doublon à l'import, donc on gardait le **premier**.
 - Depuis F6, `prepare_data.py` supprime les doublons en gardant le **dernier** (`book_tags_filtered.csv`).
 
 Les deux choix se défendent, mais ils ne donnent pas exactement les mêmes données. Toute base importée avant ce changement doit être réimportée (voir le point 10).
@@ -180,35 +179,21 @@ Sinon, une différence peut venir des données et pas du déploiement, ou au con
 
 ---
 
-## 11. Deux réécritures parallèles du même fichier
+## 11. Encodage de la console Windows
 
-**Ce qui s'est passé.** `import_data.py` a été restructuré en même temps de deux façons :
-- côté Part II : options en ligne de commande, sharding, index couvrants ;
-- côté F6 : fonction `create_indexes`, import par upsert, `book_tags_filtered.csv`.
-
-Git ne pouvait pas fusionner automatiquement.
-
-**Résolution.** On a gardé les deux. `create_indexes(db, pair)` reçoit l'ordre de l'index unique, et l'import par upsert est conservé avec les corrections 3 et 4. Les autres fichiers (`f2.py`, `prepare_data.py`, `config.py`) ont été fusionnés automatiquement et vérifiés.
-
-**Conseil.** Prévenir le binôme avant de restructurer un fichier partagé, et faire de petits commits. Un merge réussi sans conflit n'est pas forcément correct : le point 4 venait d'une combinaison des deux versions, pas d'un conflit. Il faut relancer les tests après chaque merge.
-
----
-
-## 12. Encodage de la console Windows
-
-Sous Windows, la console n'utilise pas UTF-8 par défaut. Les accents apparaissent alors mal (« V�rification »), et un `print` peut même échouer avec `UnicodeEncodeError`. Les scripts commencent par :
+Sous Windows, la console n'utilise pas UTF-8 par défaut. Les accents apparaissent alors mal ("V�rification"), et un `print` peut même échouer avec `UnicodeEncodeError`. Les scripts commencent par :
 
 ```python
 sys.stdout.reconfigure(encoding="utf-8")
 ```
 
-`f6.py` ne le faisait pas : ses lignes accentuées étaient illisibles dès que la sortie passait dans un pipe. Corrigé. `prepare_data.py` ne le fait pas encore.
+`f6.py` ne le faisait pas : ses lignes accentuées étaient illisibles dès que la sortie passait dans un pipe. Corrigé. `prepare_data.py` ne le fait pas : ses accents peuvent donc mal s'afficher dans une console Windows.
 
 ---
 
-## 13. Shard relancé juste après son arrêt
+## 12. Shard relancé juste après son arrêt
 
-**Symptôme.** `python cluster.py stop-shard 2` suivi immédiatement de `start-shard 2` : le nouveau processus s'arrête aussitôt (« Le processus du port 27302 ne répond pas »). Le même `start-shard`, relancé quelques secondes plus tard, fonctionne.
+**Symptôme.** `python cluster.py stop-shard 2` suivi immédiatement de `start-shard 2` : le nouveau processus s'arrête aussitôt ("Le processus du port 27302 ne répond pas"). Le même `start-shard`, relancé quelques secondes plus tard, fonctionne.
 
 **Cause.** `stop-shard` attend que le port ne réponde plus. Mais `mongod` finit encore son arrêt (écriture sur disque, puis libération du verrou `mongod.lock`). Lancé pendant ce temps, le nouveau `mongod` trouve le dossier de données verrouillé et s'arrête.
 

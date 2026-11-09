@@ -35,28 +35,28 @@ Dans `books.csv` la série est écrite dans le titre : `Catching Fire (The Hunge
 **Tags** --> `tag_profile`, source 1 de `similar_books`
 Des deux options, on a gardé la pondération par rareté, qui ne demande pas de choisir les tags à la main :
 - pour chaque tag du livre on compte `df`, le nombre de livres qui le portent, et on calcule `idf = log(N / df)` (N = 10 000 livres). `to-read`, porté par 99,8 % des livres, a un idf proche de 0,un tag rare a un idf élevé
-- un tag porté par plus de 50 % des livres (`COMMON_TAG_RATIO`) est classé « très fréquent » (to-read, favorites, owned, kindle, fiction…). Il ne sert pas à trouver des livres : il est seulement affiché comme contexte
+- un tag porté par plus de 50 % des livres (`COMMON_TAG_RATIO`) est classé "très fréquent" (to-read, favorites, owned, kindle, fiction...). Il ne sert pas à trouver des livres : il est seulement affiché comme contexte
 - `score_tags` = somme des idf des tags communs / somme des idf des tags du livre. C'est la part du poids thématique du livre qu'on retrouve dans l'autre livre, entre 0 et 1.
 
 **Lecteurs** --> source 2 de `similar_books`
 On a suivi la deuxième option (lecteurs qui ont aimé le livre), avec deux changements :
-- « aimé » veut dire une note ≥ 4 (`LIKE_MIN_RATING`), pas seulement 5. Avec 5 étoiles seulement, un livre peu populaire n'a presque pas de lecteurs dans notre sélection
-- le filtre « avec des tags similaires » n'est pas appliqué ici. Les tags ont déjà leur propre score, et le sujet demande de distinguer un lien par les lecteurs d'un lien par les tags. Les deux scores sont donc calculés séparément.
+- "aimé" veut dire une note >= 4 (`LIKE_MIN_RATING`), pas seulement 5. Avec 5 étoiles seulement, un livre peu populaire n'a presque pas de lecteurs dans notre sélection
+- le filtre "avec des tags similaires" n'est pas appliqué ici. Les tags ont déjà leur propre score, et le sujet demande de distinguer un lien par les lecteurs d'un lien par les tags. Les deux scores sont donc calculés séparément.
 
 Une agrégation MongoDB sur `ratings` prend les lecteurs qui ont aimé le livre, regroupe les autres livres qu'ils ont aimés et compte `co`, le nombre de lecteurs communs. Les livres avec moins de 3 lecteurs communs (`MIN_SHARED_READERS`) sont ignorés, pour éviter le bruit.
 
 Afin d'éviter l'affichage de best sellers pour chaque livres :
 - **lecteurs très actifs** : chaque lecteur compte pour `1 / sqrt(nb de livres qu'il a aimés)` au lieu de 1
-- **livres très populaires** : `score_lecteurs = somme des poids / sqrt(nA × nB)`, où nA et nB sont les nombres de lecteurs qui ont aimé chaque livre (similarité cosinus). Le score est ensuite ramené entre 0 et 1 en le divisant par le meilleur score des candidats
+- **livres très populaires** : `score_lecteurs = somme des poids / sqrt(nA x nB)`, où nA et nB sont les nombres de lecteurs qui ont aimé chaque livre (similarité cosinus). Le score est ensuite ramené entre 0 et 1 en le divisant par le meilleur score des candidats
 
-On calcule aussi le **lift** = `co / (nA × nB / nb_lecteurs)` : combien de fois il y a plus de lecteurs communs que si les deux livres étaient aimés au hasard. Il sert de preuve affichée : x1 veut dire que le lien s'explique par la popularité des livres.
+On calcule aussi le **lift** = `co / (nA x nB / nb_lecteurs)` : combien de fois il y a plus de lecteurs communs que si les deux livres étaient aimés au hasard. Il sert de preuve affichée : x1 veut dire que le lien s'explique par la popularité des livres.
 
 **Auteur / année** --> source 4 de `similar_books`, champ `b_year`
 Les deux bonus prévus sont gardés. Même auteur (au moins un nom commun dans `authors`) : +0,3. Année proche : +0,1 si c'est la même année, de moins en moins jusqu'à 0 au-delà de 5 ans d'écart. Les livres du même auteur font partie des candidats même s'ils n'ont ni tag ni lecteur en commun.
 
 **Score final et classement** --> `similar_books`
 Tout F1 tient dans une seule agrégation (`similar_books`) : chaque source (tags, lecteurs, série, auteurs) produit des livres candidats, réunis avec `$unionWith`, fusionnés par livre (`$group`), puis notés et triés. Les preuves ne sont récupérées (`$lookup`) que pour les livres retenus. `--trace` relance la même requête restreinte au second livre, donc avec le même score que dans la liste.
-`score = 0,5 × score_tags + 0,5 × score_lecteurs + bonus_auteur + bonus_année`
+`score = 0,5 x score_tags + 0,5 x score_lecteurs + bonus_auteur + bonus_année`
 Tri : tomes de la même série d'abord, puis score décroissant, puis `book_id` en cas d'égalité, pour que l'ordre soit toujours le même (utile pour comparer avec la version distribuée).
 
 **Preuves et nature du lien** --> fin du pipeline de `similar_books`, `link_nature`, `--trace`
@@ -131,7 +131,7 @@ On a gardé la deuxième idée : réutiliser F1 sur les livres les plus aimés d
 Les notes du lecteur sont lues dans l'ordre d'insertion (`_id`). C'est l'ordre des lignes de `ratings.csv`, donc l'ordre chronologique. Les livres déjà notés ne sont jamais recommandés.
 
 **Livres graines** --> `pick_seeds`
-On prend les 10 livres les mieux notés du lecteur (`F3_SEEDS`), seulement ceux notés ≥ 4 (`LIKE_MIN_RATING`), les plus récents d'abord en cas d'égalité.
+On prend les 10 livres les mieux notés du lecteur (`F3_SEEDS`), seulement ceux notés >= 4 (`LIKE_MIN_RATING`), les plus récents d'abord en cas d'égalité.
 
 **Livres similaires et score** --> `recommend`
 - Pour chaque graine on appelle `f1.similar_books` et on garde ses 10 livres similaires (`F3_SIMILAR_PER_SEED`). Les livres déjà notés sont exclus **avant** de couper à 10 (paramètre `exclude` ajouté à F1), sinon les autres tomes déjà lus prendraient toute la place.
@@ -142,16 +142,16 @@ On prend les 10 livres les mieux notés du lecteur (`F3_SEEDS`), seulement ceux 
 Pour chaque graine qui a proposé le livre, on affiche la raison donnée par F1 : même série, même auteur, nombre de lecteurs communs et lift, part des tags spécifiques communs. Pour remonter aux enregistrements : `python f1.py <graine> --trace <livre>`.
 
 **Lecteurs avec peu de notes / historique tronqué**
-- `--truncate k` ne garde que les k premières notes du lecteur. La sortie l'indique (« historique TRONQUÉ… du lecteur réel … ») : ce n'est pas un nouveau lecteur.
-- 0 note, ou aucune note ≥ 4 : pas de graine, donc pas de recommandation, et la sortie le dit.
+- `--truncate k` ne garde que les k premières notes du lecteur. La sortie l'indique ("historique TRONQUÉ... du lecteur réel ...") : ce n'est pas un nouveau lecteur.
+- 0 note, ou aucune note >= 4 : pas de graine, donc pas de recommandation, et la sortie le dit.
 - peu de notes : il y a simplement moins de graines (par exemple, tronqué à 5 notes, le lecteur 20000 a 4 graines).
 
 **Écart à la popularité** --> `popularity_stats`
 Affiché à chaque exécution :
 - le nombre de recommandations parmi les 100 livres les plus notés de la base ;
-- la popularité médiane des recommandations (nb de notes dans la base), comparée à la médiane du catalogue et à celle d'une recommandation « par popularité » (les livres les plus notés que le lecteur n'a pas lus).
+- la popularité médiane des recommandations (nb de notes dans la base), comparée à la médiane du catalogue et à celle d'une recommandation "par popularité" (les livres les plus notés que le lecteur n'a pas lus).
 
-Exemple, lecteur 20000 (91 notes, 6 recommandations, environ 9 s) : 0/6 dans le top 100, médiane de 297 notes, contre 2774 pour la recommandation par popularité et 35 pour le catalogue. F1 normalise déjà par la popularité, et ça se retrouve ici. Avec un historique tronqué à 5 notes, les graines sont des best-sellers (Hunger Games…), donc les recommandations aussi (3/3 dans le top 100).
+Exemple, lecteur 20000 (91 notes, 6 recommandations, environ 9 s) : 0/6 dans le top 100, médiane de 297 notes, contre 2774 pour la recommandation par popularité et 35 pour le catalogue. F1 normalise déjà par la popularité, et ça se retrouve ici. Avec un historique tronqué à 5 notes, les graines sont des best-sellers (Hunger Games...), donc les recommandations aussi (3/3 dans le top 100).
 
 ## F4
 Entrée : id livre1, id livre2 (fonctionnement avec noms aussi comme F1)
@@ -165,19 +165,19 @@ Il me semble que le cours de mongodb contient une requete avec un système de vo
 
 ### Implémentation
 
-Le cours n'a pas de requête de chemin toute faite. Le chapitre 1 (slides 20-21) parle seulement de parcours à plusieurs sauts (« Who can Alice reach within two hops? ») et dit que ça demande des jointures répétées. Le chapitre 3 (slide 45) classe ces parcours parmi les usages « less natural » pour MongoDB. On a donc construit F4 avec les briques du **Lab 4**, et le chaînage des étapes se fait en Python.
+Le cours n'a pas de requête de chemin toute faite. Le chapitre 1 (slides 20-21) parle seulement de parcours à plusieurs sauts ("Who can Alice reach within two hops?") et dit que ça demande des jointures répétées. Le chapitre 3 (slide 45) classe ces parcours parmi les usages "less natural" pour MongoDB. On a donc construit F4 avec les briques du **Lab 4**, et le chaînage des étapes se fait en Python.
 
 **Livres et lecteurs trop connectés (Lab 4, Q8 / Q10 : `$match` + `$group` + `$sum`)** --> `activity_stats`
 C'est la réponse à la première idée : déterminer si un livre est trop populaire ou si un lecteur a trop de livres. Deux agrégations sur `ratings` (environ 0,2 s chacune) :
-- par `user_id` : les 5 % des lecteurs qui ont aimé le plus de livres (`F4_ACTIVE_READERS`, ≥ 100 livres aimés, 499 lecteurs) sont **ignorés partout**. Un lecteur qui aime de tout relie tout à tout ;
-- par `book_id`, sans ces lecteurs : les 100 livres les plus aimés (`F4_HUB_BOOKS`, ≥ 660 lecteurs) sont des **carrefours**. Ils ne peuvent pas servir de livre intermédiaire, mais peuvent être le livre de départ ou d'arrivée.
+- par `user_id` : les 5 % des lecteurs qui ont aimé le plus de livres (`F4_ACTIVE_READERS`, >= 100 livres aimés, 499 lecteurs) sont **ignorés partout**. Un lecteur qui aime de tout relie tout à tout ;
+- par `book_id`, sans ces lecteurs : les 100 livres les plus aimés (`F4_HUB_BOOKS`, >= 660 lecteurs) sont des **carrefours**. Ils ne peuvent pas servir de livre intermédiaire, mais peuvent être le livre de départ ou d'arrivée.
 
 **Voisins d'un livre (Lab 4, Q9 : `$match` + `$group` + `$sort`, départage par `_id`)** --> `neighbors`
-Comme Q9 compte les quantités par produit, on compte pour chaque livre le nombre de lecteurs `co` qui l'ont aimé parmi ceux qui ont aimé le livre de départ (note ≥ 4). Une étape livre --> livre est **convaincante** si :
-- `co ≥ 3` (`MIN_SHARED_READERS`, comme F1) ;
-- `lift = co / (nA × nB / nb_lecteurs) ≥ 1,5` (`F4_MIN_LIFT`) : plus de lecteurs communs que le hasard, donc pas seulement parce que les deux livres sont populaires.
+Comme Q9 compte les quantités par produit, on compte pour chaque livre le nombre de lecteurs `co` qui l'ont aimé parmi ceux qui ont aimé le livre de départ (note >= 4). Une étape livre --> livre est **convaincante** si :
+- `co >= 3` (`MIN_SHARED_READERS`, comme F1) ;
+- `lift = co / (nA x nB / nb_lecteurs) >= 1,5` (`F4_MIN_LIFT`) : plus de lecteurs communs que le hasard, donc pas seulement parce que les deux livres sont populaires.
 
-Sa **force** vaut `co / sqrt(nA × nB)` (similarité cosinus, entre 0 et 1). Les voisins déjà calculés sont gardés en cache pendant la requête.
+Sa **force** vaut `co / sqrt(nA x nB)` (similarité cosinus, entre 0 et 1). Les voisins déjà calculés sont gardés en cache pendant la requête.
 
 **Recherche des chemins** --> `find_paths`
 - **Lien direct** : B est voisin de A.
@@ -187,7 +187,7 @@ Sa **force** vaut `co / sqrt(nA × nB)` (similarité cosinus, entre 0 et 1). Les
 - **Classement** : moins d'étapes d'abord, puis score décroissant, puis identifiants des livres (ordre déterministe, pour la comparaison avec la version distribuée).
 
 **Preuves d'une étape (Lab 4, Q6 : `$elemMatch` ; Q4 : `$project`)** --> `step_readers`, `catalogue_link`
-On regroupe les notes de chaque lecteur dans un tableau, puis on garde ceux dont le tableau contient les deux livres avec une note ≥ 4 :
+On regroupe les notes de chaque lecteur dans un tableau, puis on garde ceux dont le tableau contient les deux livres avec une note >= 4 :
 `{"notes": {"$all": [{"$elemMatch": {"book_id": x, "rating": {"$gte": 4}}}, {"$elemMatch": {"book_id": y, ...}}]}}`.
 Comme dans Q6, `$elemMatch` impose le livre et la note sur le **même** élément. Sans lui, on pourrait associer le livre d'une note à la note d'un autre livre.
 
@@ -195,7 +195,7 @@ Chaque étape affiche :
 - son nombre de lecteurs communs, son lift, sa force, et 3 lecteurs en exemple avec leurs deux notes ;
 - les points communs du catalogue (même auteur, même série, tags spécifiques communs, réutilisés de F1), à titre de **contexte seulement** : ils ne comptent pas dans le score.
 
-Chaque chemin est qualifié selon le nombre de lecteurs de son étape la plus faible : **solide** (≥ 10), **moyen** (≥ 5) ou **fragile**. Pour lister tous les lecteurs d'une étape : `python f1.py <livre> --trace <livre suivant>`.
+Chaque chemin est qualifié selon le nombre de lecteurs de son étape la plus faible : **solide** (>= 10), **moyen** (>= 5) ou **fragile**. Pour lister tous les lecteurs d'une étape : `python f1.py <livre> --trace <livre suivant>`.
 
 **Quand il n'y a pas de connexion convaincante**
 La sortie le dit, avec la raison :
@@ -205,7 +205,7 @@ La sortie le dit, avec la raison :
 
 **Exemples (environ 2 à 3 s chacun)**
 - `1 --> 2` (Hunger Games --> Harry Potter) : lien direct solide (1745 lecteurs communs), puis des alternatives par *Eragon*, etc.
-- `1 --> 5000` (Hunger Games --> *Passion Unleashed*, paranormal romance) : 29 chemins à 2 étapes, qui passent par des séries YA ou paranormales (*Darkfever*, *Vampire Academy*, *House of Night*…).
+- `1 --> 5000` (Hunger Games --> *Passion Unleashed*, paranormal romance) : 29 chemins à 2 étapes, qui passent par des séries YA ou paranormales (*Darkfever*, *Vampire Academy*, *House of Night*...).
 - `9000 --> 4000` (Mary Higgins Clark --> *Ranger's Apprentice*) : uniquement des chemins à 3 étapes, tous **fragiles** (3 ou 4 lecteurs). Avec `--max-steps 2` : aucune connexion.
 - `1129 --> 1` (*The History of the Hobbit*, aimé par un seul lecteur) : aucune connexion, 0 voisin convaincant.
 
@@ -236,21 +236,21 @@ aimer plus de livre d'un tag que la moyenne ?
 
 **Livres d'un tag** : un livre porte un tag s'il apparaît dans `book_tags` pour ce tag (lien `goodreads_book_id` --> `book_id` par `books`). Le `count` est affiché comme preuve mais ne sert pas au score.
 
-**Groupe de lecteurs d'un tag** : les deux pistes de la première idée sont combinées. Un lecteur aime un tag s'il a aimé (note ≥ 4) **au moins `F5_MIN_LIKED` = 3 livres** du tag **et plus que la moyenne** des lecteurs (nb total de « j'aime » sur les livres du tag / nb de lecteurs). Le seuil réel est donc `max(3, moyenne)` : pour fantasy il vaut 32,8 livres, pour vampires 4,2. Calcul : `$match` (livres du tag, note ≥ 4) + `$group` par lecteur + `$sum`.
+**Groupe de lecteurs d'un tag** : les deux pistes de la première idée sont combinées. Un lecteur aime un tag s'il a aimé (note >= 4) **au moins `F5_MIN_LIKED` = 3 livres** du tag **et plus que la moyenne** des lecteurs (nb total de "j'aime" sur les livres du tag / nb de lecteurs). Le seuil réel est donc `max(3, moyenne)` : pour fantasy il vaut 32,8 livres, pour vampires 4,2. Calcul : `$match` (livres du tag, note >= 4) + `$group` par lecteur + `$sum`.
 
-**Score de lien** : on compare le recoupement des deux groupes au hasard, comme le lift de F1/F4 : `lift = |G1 ∩ G2| × nb_lecteurs / (|G1| × |G2|)`. Le Jaccard est affiché en complément. Le nombre de livres portant les deux tags est affiché comme contexte catalogue mais n'entre pas dans le score (le sujet demande de ne pas classer sur les tags seuls).
+**Score de lien** : on compare le recoupement des deux groupes au hasard, comme le lift de F1/F4 : `lift = |G1 inter G2| x nb_lecteurs / (|G1| x |G2|)`. Le Jaccard est affiché en complément. Le nombre de livres portant les deux tags est affiché comme contexte catalogue mais n'entre pas dans le score (le sujet demande de ne pas classer sur les tags seuls).
 
-**Livres pont** : les livres aimés par les lecteurs du groupe 1 et par ceux du groupe 2 (`$match` lecteurs du groupe + `$group` par livre, une fois par groupe). On garde un livre si au moins 3 lecteurs de chaque groupe l'ont aimé et si chaque groupe l'aime plus que l'ensemble des lecteurs (part du groupe / part de tous > 1). Score = `min(part du groupe 1, part du groupe 2)` : un pont doit tenir des deux côtés. Preuves : nb de lecteurs de chaque groupe, combien de fois plus que la moyenne, `count` des deux tags sur le livre (ou « sans tag »), exemples de lecteurs des deux groupes avec leur note. La première piste (« avoir les deux tags ») n'est pas un critère : elle est seulement affichée, ce qui montre que des ponts réels ne portent pas forcément les deux tags (Harry Potter n'a pas le tag romance).
+**Livres pont** : les livres aimés par les lecteurs du groupe 1 et par ceux du groupe 2 (`$match` lecteurs du groupe + `$group` par livre, une fois par groupe). On garde un livre si au moins 3 lecteurs de chaque groupe l'ont aimé et si chaque groupe l'aime plus que l'ensemble des lecteurs (part du groupe / part de tous > 1). Score = `min(part du groupe 1, part du groupe 2)` : un pont doit tenir des deux côtés. Preuves : nb de lecteurs de chaque groupe, combien de fois plus que la moyenne, `count` des deux tags sur le livre (ou "sans tag"), exemples de lecteurs des deux groupes avec leur note. La première piste ("avoir les deux tags") n'est pas un critère : elle est seulement affichée, ce qui montre que des ponts réels ne portent pas forcément les deux tags (Harry Potter n'a pas le tag romance).
 
-**Groupe de lecteurs qui aiment les deux** : `G1 ∩ G2`, avec sa taille et 3 exemples (les lecteurs les plus engagés des deux côtés) avec un livre aimé de chaque tag.
+**Groupe de lecteurs qui aiment les deux** : `G1 inter G2`, avec sa taille et 3 exemples (les lecteurs les plus engagés des deux côtés) avec un livre aimé de chaque tag.
 
 **Sans livres populaires ni lecteurs actifs** : tout est recalculé avec les définitions de F4 (`f4.activity_stats`) : sans les 100 livres les plus aimés et sans les 5 % de lecteurs les plus actifs (seuils, groupes, lift et ponts). Verdict :
 
 - moins de 3 lecteurs communs --> pas de lien ;
 - lift brut < `F5_MIN_LIFT` = 1,5 --> lien faible ;
-- lift brut ≥ 1,5 et lift recalculé ≥ 1,5 --> le lien **tient** ; sinon il **s'effondre**.
+- lift brut >= 1,5 et lift recalculé >= 1,5 --> le lien **tient** ; sinon il **s'effondre**.
 
-**Contrôle « livres doubles »** : le recoupement est aussi recalculé sans les livres qui portent les deux tags, pour voir si le lien vient seulement des livres classés dans les deux thèmes.
+**Contrôle "livres doubles"** : le recoupement est aussi recalculé sans les livres qui portent les deux tags, pour voir si le lien vient seulement des livres classés dans les deux thèmes.
 
 ## F6
 Entrée : ratings_update_F6.csv
